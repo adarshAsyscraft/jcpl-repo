@@ -1,0 +1,814 @@
+import React, { Fragment, useContext, useEffect, useState } from "react";
+import { Col, Container, Row, Table, Label } from "reactstrap";
+import { Select } from "antd";
+import ContainerDetailsSection from "./containerDetails";
+import { Breadcrumbs } from "../../AbstractElements";
+import { fetchForwarders } from "../../Redux/slices/forwarderSlice";
+import { fetchContainerByNumber } from "../../Redux/slices/containerSlice";
+import { fetchYards } from "../../Redux/slices/yardSlice";
+import { useDispatch, useSelector } from "react-redux";
+import { useLocation } from "react-router";
+import { toast } from "react-toastify";
+import { useNavigate } from "react-router";
+import moment from "moment";
+import operationService from "../../Services/operation";
+import CustomizerContext from "../../_helper/Customizer";
+
+function StuffingProcessFetchDetails({
+  fetchedContainer,
+  forwarders,
+  forwardersLoading,
+}) {
+  const [dataByCartingNumber, setDataByCartingNumber] = useState([]);
+  const location = useLocation();
+  const forwardersState = useSelector((state) => state.forwarders || {});
+  const yardsState = useSelector((state) => state.yards || {});
+  const yards = yardsState?.data || [];
+  const dispatch = useDispatch();
+  const containerNumber = location.state?.containerNumber || "";
+  const [errors, setErrors] = useState({});
+  const { Option } = Select;
+  const [previousPageData, setPreviousPageData] = useState({});
+  const navigate = useNavigate();
+  const currentDate = moment().format("DD-MM-YYYY");
+  const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
+  const { layoutURL } = useContext(CustomizerContext);
+
+  const [formData, setFormData] = useState({
+    containerNumber: "",
+    shippingLineId: "",
+    size: "",
+    type: "",
+    tareWeight: "",
+    mgWeight: "",
+    mfdDate: "",
+    cscValidity: "",
+    shippingLine: "",
+    forwarder1: "",
+    forwarder2: "",
+    stuffingDate: "",
+    cargoCategory: "",
+    unNumber: "",
+    imoNumber: "",
+    temperature: "",
+    bookingNo: "",
+    yardId: "",
+    dischargePortName: "",
+    pol: "",
+    pdaAccount: "",
+    fpd: "",
+    hsCode: "",
+    aggrementParty: "",
+    vgmByShipper: "",
+    vesselViaNumber: "",
+    placeOfHandOver: "",
+    shipline: "",
+    custom: "",
+    other: "",
+    remarks:
+      "1. CONTAINER STUFFED IN SOUND CONDITION. 2. CARGO DETAILS/WEIGHT AS DECLARED IN THE SHIPPING BILL/INVOICE, ALL PACKAGES STUFFED ARE INSPECTED TO EXTERNAL CONDITION ONLY.",
+    anyOtherRemarks: "",
+  });
+
+  useEffect(() => {
+    dispatch(fetchForwarders());
+    dispatch(fetchYards());
+  }, [dispatch]);
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      containerNumber: fetchedContainer?.container_number || "",
+      shippingLineId: fetchedContainer?.shipping_line_id || "",
+      size: fetchedContainer?.size || "",
+      type: fetchedContainer?.container_type || "",
+      tareWeight: fetchedContainer?.tare_weight || "",
+      mgWeight: fetchedContainer?.mg_weight || "",
+      mfdDate: fetchedContainer?.mfd_date || "",
+      cscValidity: fetchedContainer?.csc_validity || "",
+      remarks: fetchedContainer?.remarks || "",
+    }));
+  }, [fetchedContainer]);
+
+  const getPreviousData = async () => {
+    let res;
+    let lastOp = localStorage.getItem("operation");
+    const containerNumber = fetchedContainer?.container_number;
+    if (lastOp == "19") {
+      res = await operationService.allotmentStuffingDetailsByContainerNo(
+        containerNumber
+      );
+      if (res.success) {
+        setPreviousPageData(res.data);
+      }
+    } else if (lastOp == "9") {
+      res = await operationService.getStuffingLclDetails(containerNumber);
+    }
+    if (res.success && res.data.length > 0) {
+      setPreviousPageData(res.data[0]);
+    }
+  };
+
+  const fetchCartingDetails = async () => {
+    try {
+      const queryParams = {
+        containerNumber: fetchedContainer.container_number || containerNumber,
+      };
+      console.log("Container NUmber::", formData.containerNumber);
+      const res = await operationService.getCartingDetails(queryParams);
+      if (res.success) {
+        setDataByCartingNumber(res.data);
+        console.log("Carting detail::", res.data);
+      } else {
+        toast.error(res.message || "Failed to fetch carting details");
+      }
+    } catch (err) {
+      console.error("Fetch Error:", err);
+      toast.error("Something went wrong while fetching details.");
+    }
+  };
+
+  useEffect(() => {
+    getPreviousData();
+    fetchCartingDetails();
+  }, [containerNumber]);
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      // stuffingDate: moment(previousPageData?.inDate).format("DD-MM-YYYY"),
+      cargoCategory: previousPageData.cargo_category,
+      unNumber: previousPageData.un_number,
+      imoNumber: previousPageData.imo_number,
+      temperature: previousPageData.temperature,
+      bookingNo: previousPageData.booking_no,
+      yardId: previousPageData.yard_id,
+      pol: previousPageData.pol,
+      pod: previousPageData.pod,
+      dischargePortName:
+        previousPageData.discharge_port_name || previousPageData.pod || null,
+      fpd: previousPageData.fpd,
+      pdaAccount: previousPageData.pda_account,
+      aggrementParty: previousPageData?.agreement_party,
+      // vgmByShipper: previousPageData?.shipper,
+      vesselViaNumber: previousPageData.vessel_via_no,
+      placeOfHandOver: previousPageData.place_of_handover,
+      shipline:
+        previousPageData.ship_line ||
+        previousPageData.shipping_line_seal ||
+        null,
+      custom: previousPageData.custom || previousPageData.custom_seal || null,
+      other: previousPageData.other,
+      otherSealRemarks: previousPageData.other_seal_desc,
+      remarks: previousPageData.remark,
+    }));
+  }, [previousPageData]);
+
+  useEffect(() => {
+    const fetchCartingDetails = async () => {
+      if (!fetchedContainer?.container_number) return;
+      try {
+        const res = await operationService.cartingDetailsByContainerNo(
+          fetchedContainer.container_number
+        );
+        if (res.success) {
+          setDataByCartingNumber(res.data?.data || []);
+        } else {
+          setDataByCartingNumber([]);
+          toast.error(res.message || "Failed to fetch carting details");
+        }
+      } catch (error) {
+        setDataByCartingNumber([]);
+        toast.error("Error fetching carting details");
+        console.error(error);
+      }
+    };
+
+    fetchCartingDetails();
+  }, [fetchedContainer?.container_number]);
+
+  const handleChange = (e) => {
+    let { name, value } = e.target;
+
+    if (
+      name == "remarks" ||
+      name == "anyOtherRemarks" ||
+      e.target.type == "text"
+    ) {
+      value = value.toUpperCase();
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name, value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setErrors((errors) => ({ ...errors, [name]: undefined }));
+  };
+
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Allow only DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY using the same separator
+    const isValidFormat =
+      /^(0[1-9]|[12][0-9]|3[01])([-/.])(?:0[1-9]|1[0-2])\2\d{4}$/.test(value);
+
+    // Determine correct format based on separator
+    const matched = value.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/);
+    const separator = matched?.[2];
+    const formatMap = {
+      "-": "DD-MM-YYYY",
+      "/": "DD/MM/YYYY",
+      ".": "DD.MM.YYYY",
+    };
+    const inputDate = moment(value, formatMap[separator], true);
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!value) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Date is required",
+      }));
+    } else if (!isValidFormat || !inputDate.isValid()) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
+      }));
+    } else if (inputDate.isAfter(current)) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Date cannot be in the future",
+      }));
+    } else if (inputDate.isBefore(minimum)) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Date cannot be more than 3 days in the past",
+      }));
+    } else {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: undefined,
+      }));
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const payload = {
+        shippingLine: formData.shippingLine || null,
+        forwarder1: formData.forwarder1 || null,
+        forwarder2: formData.forwarder2 || null,
+        stuffingDate:
+          moment(formData.stuffingDate, "DD-MM-YYYY").format("YYYY-MM-DD") ||
+          null,
+        cargoCategory: formData.cargoCategory || null,
+        unNumber: formData.unNumber || null,
+        imoNumber: formData.imoNumber || null,
+        temperature: formData.temperature || null,
+        bookingNo: formData.bookingNo || null,
+        yardId: formData.yardId || null,
+        dischargePortName: formData.dischargePortName || null,
+        pol: formData.pol || null,
+        pdaAccount: formData.pdaAccount || null,
+        fpd: formData.fpd || null,
+        hsCode: formData.hsCode || null,
+        aggrementParty: formData.aggrementParty || null,
+        vgmByShipper: formData.vgmByShipper || null,
+        vesselViaNumber: formData.vesselViaNumber || null,
+        placeOfHandOver: formData.placeOfHandOver || null,
+        shipline: formData.shipline || null,
+        custom: formData.custom || null,
+        other: formData.other || null,
+        remarks: formData.remarks || null,
+        anyOtherRemarks: formData.anyOtherRemarks || null,
+      };
+      const res = await operationService.stuffingProceed(payload);
+      if (res.success) {
+        toast.success("Stuffing Proceed Created Successfully");
+        navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
+      }
+    } catch (error) {
+      console.log("Unable to fetch data");
+    }
+  };
+
+  return (
+    <Fragment>
+      <Breadcrumbs
+        mainTitle="Stuffing Details"
+        parent="Apps"
+        title="Stuffing Details"
+      />
+      <Container fluid={true} className="container-wrap">
+        <Row>
+          <Col sm="12">
+            <div className="card shadow p-4">
+              <ContainerDetailsSection
+                formData={formData}
+                handleChange={handleChange}
+                forwarders={forwarders}
+                forwardersLoading={forwardersLoading.loading}
+                fetchedContainer={fetchedContainer}
+                disabled={true}
+              />
+              <div className="table-responsive rounded shadow-sm border my-3">
+                <Table
+                  className="text-center align-middle mb-0 table-responsive"
+                  style={{
+                    backgroundColor: "#ffffff",
+                    tableLayout: "fixed",
+                    width: "100%",
+                  }}
+                >
+                  <thead style={{ backgroundColor: "#dddddd" }}>
+                    <tr>
+                      <th style={{ width: "60px" }}>S.NO.</th>
+                      <th style={{ width: "120px" }}>Forwarder Code</th>
+                      <th style={{ width: "130px" }}>Ship Bill Number</th>
+                      <th style={{ width: "110px" }}>Ship Bill Date</th>
+                      <th style={{ width: "150px", whiteSpace: "normal" }}>
+                        Shipper Name
+                      </th>
+                      <th style={{ width: "150px", whiteSpace: "normal" }}>
+                        Consignee Name
+                      </th>
+                      <th style={{ width: "100px" }}>Cargo Type</th>
+                      <th style={{ width: "110px" }}>Cargo Weight</th>
+                      <th style={{ width: "100px" }}>Packed In</th>
+                      <th style={{ width: "100px" }}>Packages</th>
+                      <th style={{ width: "90px" }}>CBM</th>
+                      <th style={{ width: "150px", whiteSpace: "normal" }}>
+                        Marks
+                      </th>
+                      <th style={{ width: "150px", whiteSpace: "normal" }}>
+                        Remarks
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(dataByCartingNumber) &&
+                    dataByCartingNumber.length > 0 ? (
+                      <>
+                        {dataByCartingNumber.map((item, index) => (
+                          <tr key={index}>
+                            <td>{index + 1}</td>
+                            <td>
+                              {item.shipping_line_forwarder_name || "N/A"}
+                            </td>
+                            <td>{item.ship_bill_number || "N/A"}</td>
+                            <td>
+                              {moment(item.ship_bill_date).format(
+                                "DD-MM-YYYY"
+                              ) || "N/A"}
+                            </td>
+                            <td style={{ wordWrap: "break-word" }}>
+                              {item.shipper || "N/A"}
+                            </td>
+                            <td style={{ wordWrap: "break-word" }}>
+                              {item.consignee || "N/A"}
+                            </td>
+                            <td>{item.cargo || "N/A"}</td>
+                            <td>
+                              {item.cargo_weight
+                                ? `${item.cargo_weight}`
+                                : "N/A"}
+                            </td>
+                            <td>{item.packed_in || "N/A"}</td>
+                            <td>{item.packages || "N/A"}</td>
+                            <td>
+                              {item.cbm != null
+                                ? parseFloat(item.cbm).toFixed(3)
+                                : "N/A"}
+                            </td>
+
+                            <td style={{ wordWrap: "break-word" }}>
+                              {item.marks || "N/A"}
+                            </td>
+                            <td style={{ wordWrap: "break-word" }}>
+                              {item.remarks || "N/A"}
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* Footer row with totals */}
+                        <tr
+                          style={{
+                            backgroundColor: "#f8f9fa",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          <td colSpan="7" className="text-end">
+                            Total
+                          </td>
+                          <td>
+                            {dataByCartingNumber
+                              .reduce(
+                                (sum, item) =>
+                                  sum + (parseFloat(item.cargo_weight) || 0),
+                                0
+                              )
+                              .toFixed(2)}{" "}
+                          </td>
+                          <td></td>
+                          <td>
+                            {dataByCartingNumber
+                              .reduce(
+                                (sum, item) =>
+                                  sum + (parseFloat(item.packages) || 0),
+                                0
+                              )
+                              .toFixed(2)}
+                          </td>
+                          <td>
+                            {dataByCartingNumber
+                              .reduce(
+                                (sum, item) =>
+                                  sum + (parseFloat(item.cbm) || 0),
+                                0
+                              )
+                              .toFixed(3)}
+                          </td>
+                          <td colSpan="3"></td>
+                        </tr>
+                      </>
+                    ) : (
+                      <tr>
+                        <td colSpan="14" className="text-center text-muted">
+                          No data found. Please search by Carting ID or Ship
+                          Bill Number.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </Table>
+              </div>
+              <div className="clientDetails">
+                <Table>
+                  <h5 className="mb-3 mt-4">Client Detail</h5>
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <Label className="large mb-1">Shipping Line</Label>
+                      <select
+                        name="shippingLineId"
+                        className="form-select"
+                        onChange={handleChange}
+                        value={formData.shippingLineId}
+                        disabled
+                      >
+                        <option value="">Select Shipping Line</option>
+                        {forwarders.map((fwd) => (
+                          <option key={fwd.id} value={fwd.id}>
+                            {fwd.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Col>
+                  </Row>
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <label>Forwarder1 Name</label>
+                      <select
+                        name="forwarder1"
+                        className="form-select"
+                        onChange={handleChange}
+                        value={formData.forwarder1}
+                      >
+                        <option value="">Select Forwarder1 Code Name</option>
+                        {forwarders
+                          .filter((res) => res.category == "shipping")
+                          .map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                      </select>
+                    </Col>
+
+                    <Col md="6">
+                      <label>Forwarder2 Name</label>
+                      <select
+                        name="forwarder2"
+                        className="form-select"
+                        onChange={handleChange}
+                        value={formData.forwarder2}
+                      >
+                        <option value="">Select Forwarder2 Code Name</option>
+                        {forwarders
+                          .filter((res) => res.category == "shipping")
+                          .map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                      </select>
+                    </Col>
+                  </Row>
+
+                  <h5 className="mb-3">Stuffing Details</h5>
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <Label>Stuffing Date</Label>
+                      <input
+                        type="text"
+                        name="stuffingDate"
+                        className={`form-control ${
+                          errors.stuffingDate ? "is-invalid" : ""
+                        }`}
+                        placeholder="DD-MM-YYYY"
+                        onChange={handleDateChange}
+                        value={formData.stuffingDate}
+                      />
+                      {errors?.stuffingDate && (
+                        <div className="text-danger">{errors.stuffingDate}</div>
+                      )}
+                    </Col>
+                    <Col md="6">
+                      <label htmlFor="">Cargo Category</label>
+                      <select
+                        name="cargoCategory"
+                        className={`form-select ${
+                          errors.cargoCategory ? "is-invalid" : ""
+                        }`}
+                        onChange={handleChange}
+                        value={formData.cargoCategory}
+                        required
+                      >
+                        <option value="">Select Category</option>
+                        <option value="hazardous">Hazardous</option>
+                        <option value="non-hazardous">Non Hazardous</option>
+                        <option value="refer">Refer</option>
+                        <option value="both">Both</option>
+                      </select>
+                      {errors.cargoCategory && (
+                        <div className="invalid-feedback">
+                          {errors.cargoCategory}
+                        </div>
+                      )}
+                    </Col>
+                  </Row>
+                  {(formData.cargoCategory === "hazardous" ||
+                    formData.cargoCategory === "both") && (
+                    <Row className="mb-3">
+                      <Col md="6">
+                        <label>IMO Number</label>
+                        <input
+                          name="imoNumber"
+                          type="text"
+                          className="form-control"
+                          onChange={handleChange}
+                          value={formData.imoNumber}
+                        />
+                      </Col>
+                      <Col md="6">
+                        <label>UN Number</label>
+                        <input
+                          name="unNumber"
+                          type="text"
+                          className="form-control"
+                          onChange={handleChange}
+                          value={formData.unNumber}
+                        />
+                      </Col>
+                    </Row>
+                  )}
+
+                  {(formData.cargoCategory === "refer" ||
+                    formData.cargoCategory === "both") && (
+                    <Row className="mb-3">
+                      <Col md="6">
+                        <label>Temperature</label>
+                        <input
+                          name="temperature"
+                          type="text"
+                          className="form-control"
+                          onChange={handleChange}
+                          value={formData.temperature}
+                        />
+                      </Col>
+                    </Row>
+                  )}
+
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <Label>Booking No.</Label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        onChange={handleChange}
+                        name="bookingNo"
+                        value={formData.bookingNo}
+                      />
+                    </Col>
+                    <Col md="6">
+                      <label>Yard Name</label>
+                      <select
+                        name="yardId"
+                        onChange={handleChange}
+                        value={formData.yardId}
+                        className={`form-select ${
+                          errors.yardId ? "is-invalid" : ""
+                        }`}
+                      >
+                        <option value="">Select Yard</option>
+                        {yards.map((yard) => (
+                          <option key={yard.id} value={yard.id}>
+                            {yard.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.yardId && (
+                        <div className="invalid-feedback">{errors.yardId}</div>
+                      )}
+                    </Col>
+                  </Row>
+
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <Label>Discharge Port Name</Label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="dischargePortName"
+                        onChange={handleChange}
+                        value={formData.dischargePortName}
+                      />
+                    </Col>
+                    <Col md="6">
+                      <Label>FPD</Label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        onChange={handleChange}
+                        name="fpd"
+                        value={formData.fpd}
+                      />
+                    </Col>
+                  </Row>
+
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <label>PDA Account</label>
+                      <select
+                        name="pdaAccount"
+                        className="form-select"
+                        onChange={handleChange}
+                        value={formData.pdaAccount}
+                      >
+                        <option value="">Select PDA</option>
+                        <option value="shipper pda">Shipper PDA</option>
+                        <option value="linear pda">Linear PDA</option>
+                      </select>
+                    </Col>
+                    <Col md="6">
+                      <Label>POL</Label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        onChange={handleChange}
+                        name="pol"
+                        value={formData.pol}
+                      />
+                    </Col>
+                  </Row>
+
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <Label>HS Code</Label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="hsCode"
+                        onChange={handleChange}
+                        value={formData.hsCode}
+                      />
+                    </Col>
+                    <Col md="6">
+                      <Label>Agreement Party</Label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="aggrementParty"
+                        onChange={handleChange}
+                        value={formData.aggrementParty}
+                      />
+                    </Col>
+                  </Row>
+
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <Label>VGM By Shipper</Label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="vgmByShipper"
+                        onChange={handleChange}
+                        value={formData.vgmByShipper}
+                      />
+                    </Col>
+                    <Col md="6">
+                      <Label>Vessel & Via No.</Label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="vesselViaNumber"
+                        onChange={handleChange}
+                        value={formData.vesselViaNumber}
+                      />
+                    </Col>
+                  </Row>
+
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <Label>Place Of HandOver</Label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        name="placeOfHandOver"
+                        onChange={handleChange}
+                        value={formData.placeOfHandOver}
+                      />
+                    </Col>
+                  </Row>
+                </Table>
+              </div>
+              <h6 className="mt-5">Seal Details</h6>
+              <Row className="mb-3">
+                <Col md="6">
+                  <label className="form-label">Shipline</label>
+                  <input
+                    name="shipline"
+                    type="text"
+                    className="form-control"
+                    onChange={handleChange}
+                    value={formData.shipline}
+                  />
+                </Col>
+                <Col md="6">
+                  <label className="form-label">Custom</label>
+                  <input
+                    name="custom"
+                    type="text"
+                    className="form-control"
+                    onChange={handleChange}
+                    value={formData.custom}
+                  />
+                </Col>
+              </Row>
+
+              <Row className="mb-3">
+                <Col md="6">
+                  <label className="form-label">Other</label>
+                  <input
+                    name="other"
+                    type="text"
+                    className="form-control"
+                    onChange={handleChange}
+                    value={formData.other}
+                  />
+                </Col>
+              </Row>
+
+              <h6 className="mt-5">Container Condition</h6>
+              <Row className="mb-3">
+                <Col md="6">
+                  <label className="form-label">Remarks</label>
+                  <textarea
+                    name="remarks"
+                    className="form-control"
+                    rows="3"
+                    onChange={handleChange}
+                    value={formData.remarks}
+                  />
+                </Col>
+                <Col md="6">
+                  <label className="form-label">Any Other Remarks</label>
+                  <textarea
+                    name="anyOtherRemarks"
+                    className="form-control"
+                    rows="3"
+                    onChange={handleChange}
+                    value={formData.anyOtherRemarks}
+                  />
+                </Col>
+              </Row>
+
+              <div className="text-center mt-4">
+                <button
+                  className="btn btn-primary w-100"
+                  onClick={handleSubmit}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </Container>
+    </Fragment>
+  );
+}
+
+export default StuffingProcessFetchDetails;

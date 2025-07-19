@@ -1,0 +1,613 @@
+import { icon } from "leaflet";
+
+export const MENUITEMS = [
+  {
+    menutitle: "General",
+    menucontent: "Dashboards,Widgets",
+    Items: [
+      {
+        title: "Dashboard",
+        icon: "home",
+        type: "sub",
+        badge: "badge badge-light-primary",
+        badgetxt: "5",
+        // active: false,
+        roles: ["admin", "sub-admin", "trainer"],
+        children: [
+          {
+            path: `${process.env.PUBLIC_URL}/dashboard/default`,
+            title: "Default",
+            type: "link",
+            roles: ["admin", "sub-admin"],
+          },
+          {
+            path: `${process.env.PUBLIC_URL}/dashboard/users`,
+            title: "Users",
+            type: "link",
+          },
+          {
+            path: `${process.env.PUBLIC_URL}/dashboard/icds`,
+            title: "Icd",
+            type: "link",
+          },
+          {
+            path: `${process.env.PUBLIC_URL}/dashboard/yards`,
+            title: "Yard",
+            type: "link",
+          },
+          {
+            path: `${process.env.PUBLIC_URL}/dashboard/containers`,
+            title: "Container",
+            type: "link",
+          },
+          {
+            path: `${process.env.PUBLIC_URL}/dashboard/containerTypes`,
+            title: "Container Type",
+            type: "link",
+          },
+          {
+            path: `${process.env.PUBLIC_URL}/dashboard/forwarders`,
+            title: "Shipping Line/Forwarders",
+            type: "link",
+            roles: ["admin", "sub-admin"],
+          },
+          {
+            path: `${process.env.PUBLIC_URL}/dashboard/transporter`,
+            title: "Transporter",
+            type: "link",
+          },
+        ],
+      },
+      // {
+      //   title: "Dashboard",
+      //   icon: "home",
+      //   type: "sub",
+      //   badge: "badge badge-light-primary",
+      //   badgetxt: "5",
+      //   // active: false,
+      //   roles: ["admin", "sub-admin", "trainer"],
+      //   children: [
+      //     { path: `${process.env.PUBLIC_URL}/dashboard/default`, title: "Default", type: "link", roles: ["admin", "sub-admin"] },
+      //     { path: `${process.env.PUBLIC_URL}/`, title: "Products", type: "link" },
+      //     { path: `${process.env.PUBLIC_URL}/dashboard/e-commerce`, title: "Products", type: "link" },
+      //     { path: `${process.env.PUBLIC_URL}/dashboard/online-course`, title: "Online Course", type: "link" },
+      //     { path: `${process.env.PUBLIC_URL}/dashboard/crypto`, title: "Crypto", type: "link" },
+      //     { path: `${process.env.PUBLIC_URL}/dashboard/social`, title: "Social", type: "link" },
+      //   ],
+      // },
+      // {
+      //   title: "Operation",
+      //   icon: "home",
+      //   type: "sub",
+      //   badge: "badge badge-light-primary",
+      //   badgetxt: "5",
+      //   // active: false,
+      //   roles: ["admin", "sub-admin", "trainer"],
+      //   children: [
+      //   ],
+      // },
+      {
+        path: `${process.env.PUBLIC_URL}/app/operation`,
+        title: "Operation",
+        icon: "others",
+        type: "link",
+      },
+      {
+        path: `${process.env.PUBLIC_URL}/app/attendance`,
+        title: "Attendance",
+        icon: "Chart",
+        type: "link",
+      },
+
+      // {
+      //   title: "Widgets",
+      //   icon: "widget",
+      //   type: "sub",
+      //   active: false,
+      //   children: [
+      //     { path: `${process.env.PUBLIC_URL}/widgets/general`, title: "General", type: "link" },
+      //     { path: `${process.env.PUBLIC_URL}/widgets/chart`, title: "Chart", type: "link" },
+      //   ],
+      // },
+    ],
+  },
+
+  // {
+  //   menutitle: "Revenue Management",
+  //   menucontent: "Ready to use Apps",
+  //   Items: [
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Revenue", roles: ["admin"] },
+  //   ]
+  // },
+  // {
+  //   menutitle: "Attendance",
+  //   menucontent: "Ready to use Apps",
+  //   Items: [
+  //      {type: "sub",badge: "badge badge-light-primary", badgetxt: "2", icon: "mobile-phone",icon: "home", title: "Device Company", roles: ["admin", "sub-admin"],
+  //      children: [
+  //       { path: `${process.env.PUBLIC_URL}/zkteco/info`, title: "ZKTeco", type: "link", roles: ["admin", "sub-admin"] },
+  //       { path: `${process.env.PUBLIC_URL}/essl/info`, title: "ESSL", type: "link", roles: ["admin", "sub-admin"] },
+  //     ]},
+  //      { path: `${process.env.PUBLIC_URL}/attendance`, icon: "users", type: "link", title: "Attendance", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/attendance/users`, icon: "users", type: "link", title: "Users", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/attendance/transactions`, icon: "list", type: "link", title: "Transaction", roles: ["admin"] },
+  //   ]
+  // },
+  // {
+  //   menutitle: "User Management",
+  //   menucontent: "Ready to use Apps",
+  //   Items: [
+  //     {type: "sub",badge: "badge badge-light-primary", badgetxt: "2", icon: "ui-kits", title: "Trainer", roles: ["admin", "sub-admin"],active: false,
+  //     children: [
+  //      { path: `${process.env.PUBLIC_URL}/trainers`, title: "Trainer", type: "link", roles: ["admin", "sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/trainer/booking-history`, title: "Booking History", type: "link", roles: ["admin", "sub-admin"] },
+  //    ]},
+  //     {type: "sub", icon: "others", title: "Packages", roles: ["admin", "sub-admin"],
+  //     children: [
+  //      { path: `${process.env.PUBLIC_URL}/packages`, title: "Packages", type: "link", roles: ["admin", "sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/packages/booking-history`, title: "Buy Packages History", type: "link", roles: ["admin", "sub-admin"] },
+  //    ]},
+  //      { path: `${process.env.PUBLIC_URL}/members`, icon: "users-alt-5", type: "link", title: "Members", roles: ["admin", "sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/gyms`, icon: "gym-alt-2", type: "link", title: "Gyms", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/leads`, icon: "users-social", type: "link", title: "Leads", roles: ["admin", "sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/packages`, icon: "social-dropbox", type: "link", title: "Packages", roles: ["admin", "trainer"] },
+  //   ]
+  // },
+
+  // {
+  //   menutitle: "Applications",
+  //   menucontent: "Ready to use Apps",
+  //   Items: [
+  //     { path: `${process.env.PUBLIC_URL}/banner`, icon: "image", type: "link", title: "Banner", roles: ["admin", "sub-admin"]  },
+  //     // {
+  //     //   title: "Project",
+  //     //   icon: "project",
+  //     //   type: "sub",
+  //     //   badge: "badge badge-light-secondary",
+  //     //   badgetxt: "New",
+  //     //   active: false,
+  //     //   children: [
+  //     //     { path: `${process.env.PUBLIC_URL}/app/project/project-list`, type: "link", title: "Project-List" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/project/new-project`, type: "link", title: "Create New" },
+  //     //   ],
+  //     // },
+  //     // { path: `${process.env.PUBLIC_URL}/app/file-manager`, icon: "file", title: "File-Manager", type: "link" },
+  //     // {
+  //     //   title: "Ecommerce",
+  //     //   icon: "ecommerce",
+  //     //   type: "sub",
+  //     //   active: false,
+  //     //   children: [
+  //     //     { path: `${process.env.PUBLIC_URL}/app/ecommerce/product`, title: "Products", type: "link" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/ecommerce/product-page/1`, title: "Product-Page", type: "link" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/ecommerce/product-list`, title: "Product-List", type: "link" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/ecommerce/payment-details`, title: "Payment-Detail", type: "link" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/ecommerce/orderhistory`, title: "OrderHistory", type: "link" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/ecommerce/invoice`, title: "Invoice", type: "link" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/ecommerce/cart`, title: "Cart", type: "link" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/ecommerce/wishlist`, title: "Wishlist", type: "link" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/ecommerce/checkout`, title: "checkout", type: "link" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/ecommerce/pricing`, title: "Pricing", type: "link" },
+  //     //   ],
+  //     // },
+  //     // { path: `${process.env.PUBLIC_URL}/app/email-app`, icon: "email", title: "Email", type: "link" },
+  //     // {
+  //     //   title: "Chat",
+  //     //   icon: "chat",
+  //     //   type: "sub",
+  //     //   active: false,
+  //     //   children: [
+  //     //     { path: `${process.env.PUBLIC_URL}/app/chat-app/chats`, type: "link", title: "Chats" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/chat-app/chat-video-app`, type: "link", title: "Video-app" },
+  //     //   ],
+  //     // },
+  //     // {
+  //     //   title: "Users",
+  //     //   icon: "user",
+  //     //   path: `${process.env.PUBLIC_URL}/app/users/profile`,
+  //     //   type: "sub",
+  //     //   bookmark: true,
+  //     //   active: false,
+  //     //   children: [
+  //     //     { path: `${process.env.PUBLIC_URL}/app/users/profile`, type: "link", title: "User Profile" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/users/edit`, type: "link", title: "User Edit" },
+  //     //     { path: `${process.env.PUBLIC_URL}/app/users/cards`, type: "link", title: "User Cards" },
+  //     //   ],
+  //     // },
+  //     // { path: `${process.env.PUBLIC_URL}/app/bookmark`, icon: "bookmark", type: "link", title: "Bookmark" },
+  //     // {
+  //     //   title: "Contact",
+  //     //   icon: "contact",
+  //     //   type: "link",
+  //     //   active: false,
+  //     //   path: `${process.env.PUBLIC_URL}/app/contact-app/contacts`,
+  //     // },
+  //     // { path: `${process.env.PUBLIC_URL}/app/task`, icon: "task", type: "link", title: "Task" },
+  //     // { path: `${process.env.PUBLIC_URL}/app/calendar/draggable-calendar`, icon: "calendar", type: "link", title: "Calendar" },
+
+  //     // { path: `${process.env.PUBLIC_URL}/app/social-app`, icon: "social", type: "link", title: "Social-App", bookmark: true },
+  //     // { path: `${process.env.PUBLIC_URL}/app/todo-app/todo`, icon: "to-do", type: "link", title: "Todo" },
+  //     // { path: `${process.env.PUBLIC_URL}/app/search`, icon: "search", type: "link", title: "Search Result" },
+  //   ],
+  // },
+
+  // {
+  //   menutitle: "Admin",
+  //   menucontent: "Ready to use Apps",
+  //   Items: [
+  //      { path: `${process.env.PUBLIC_URL}/dashboard/default`, icon: "home", type: "link", title: "Dashboard", roles: ["sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/members`, icon: "users-social", type: "link", title: "Member Management", roles: ["sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/leads`, icon: "user", type: "link", title: "Lead Manangement", roles: ["sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "ui-user-group", type: "link", title: "Attendance Management", roles: ["sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/employees`, icon: "users", type: "link", title: "Employee Management", roles: ["sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/workout_plan`, icon: "gym", type: "link", title: "Workout Management", roles: ["sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/pt_schedule`,active: false, icon: "calendar", type: "link", title: "PT Schedule", roles: ["sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Revenue", roles: ["sub-admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/zkteco/info`, icon: "finger-print", type: "link", title: "Bio-metric", roles: ["sub-admin"] },
+  //   ]
+  // },
+  // {
+  //   menutitle: "Super Admin",
+  //   menucontent: "Ready to use Apps",
+  //   Items: [
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Dashboard", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Gym Lead management", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Member Gym management", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Support", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Revenue", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "System setting", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Marketing management", roles: ["admin"] },
+  //   ]
+  // },
+  // {
+  //   menutitle: "B2C User Super Admin",
+  //   menucontent: "Ready to use Apps",
+  //   Items: [
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Dashboard", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "User management", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Subscriptions", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Health", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "Content management", roles: ["admin"] },
+  //      { path: `${process.env.PUBLIC_URL}/revenue`, icon: "cur-rupee", type: "link", title: "System setting", roles: ["admin"] },
+  //   ]
+  // },
+
+  // {
+  //   menutitle: "Forms & Table",
+  //   menucontent: "Ready to use froms & tables",
+  //   Items: [
+  //     {
+  //       title: "Forms",
+  //       icon: "form",
+  //       type: "sub",
+  //       menutitle: "Forms & Table",
+  //       menucontent: "Ready to use froms & tables",
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         {
+  //           title: "Controls",
+  //           type: "sub",
+  //           roles: ["admin"],
+  //           children: [
+  //             { title: "Validation", type: "link", path: `${process.env.PUBLIC_URL}/forms/controls/validation` ,roles: ["admin"],},
+  //             { title: "Input", type: "link", path: `${process.env.PUBLIC_URL}/forms/controls/input` ,roles: ["admin"],},
+  //             { title: "Radio-Checkbox", type: "link", path: `${process.env.PUBLIC_URL}/forms/controls/radio-checkbox` ,roles: ["admin"],},
+  //             { title: "Group", type: "link", path: `${process.env.PUBLIC_URL}/forms/controls/group` ,roles: ["admin"],},
+  //             { title: "MegaOption", type: "link", path: `${process.env.PUBLIC_URL}/forms/controls/megaoption` ,roles: ["admin"],},
+  //           ],
+  //         },
+  //         {
+  //           title: "Widget",
+  //           type: "sub",
+  //           roles: ["admin"],
+  //       children: [
+  //             { roles: ["admin"],title: "Datepicker", type: "link", path: `${process.env.PUBLIC_URL}/forms/widget/datepicker` },
+  //             { roles: ["admin"],title: "Datetimepicker", type: "link", path: `${process.env.PUBLIC_URL}/forms/widget/datetimepicker` },
+  //             { roles: ["admin"],title: "Touchspin", type: "link", path: `${process.env.PUBLIC_URL}/forms/widget/touchspin` },
+  //             { roles: ["admin"],title: "Select2", type: "link", path: `${process.env.PUBLIC_URL}/forms/widget/select2` },
+  //             { roles: ["admin"],title: "Switch", type: "link", path: `${process.env.PUBLIC_URL}/forms/widget/switch` },
+  //             { roles: ["admin"],title: "Typeahead", type: "link", path: `${process.env.PUBLIC_URL}/forms/widget/typeahead` },
+  //             { roles: ["admin"],title: "Clipboard", type: "link", path: `${process.env.PUBLIC_URL}/forms/widget/clipboard` },
+  //           ],
+  //         },
+  //         {
+  //           title: "Layout",
+  //           type: "sub",
+  //           roles: ["admin"],
+  //       children: [
+  //             { roles: ["admin"],path: `${process.env.PUBLIC_URL}/forms/layout/formdefault`, title: "FormDefault", type: "link" },
+  //             { roles: ["admin"],path: `${process.env.PUBLIC_URL}/forms/layout/formwizard`, title: "FormWizard", type: "link" },
+  //           ],
+  //         },
+  //       ],
+  //     },
+
+  //     {
+  //       title: "Table",
+  //       icon: "table",
+  //       type: "sub",
+  //       roles: ["admin"],
+  //       children: [
+  //         {roles: ["admin"],
+  //           title: "ReactstrapTable",
+  //           type: "link",
+  //           path: `${process.env.PUBLIC_URL}/table/reactstraptable/basictable`,
+  //         },
+  //         {roles: ["admin"],
+  //           title: "DataTable",
+  //           path: `${process.env.PUBLIC_URL}/table/datatable`,
+  //           type: "link",
+  //         },
+  //       ],
+  //     },
+  //   ],
+  // },
+
+  // {
+  //   menutitle: "Components",
+  //   menucontent: "UI Components & Elements",
+  //   Items: [
+  //     {
+  //       title: "Ui-Kits",
+  //       icon: "ui-kits",
+  //       type: "sub",
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/typography`, title: "Typography", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/avatar`, title: "Avatar", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/helper-class`, title: "Helper-Class", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/grids`, title: "Grids", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/tag-pills`, title: "Tag-Pills", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/progress`, title: "Progress", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/modal`, title: "Modal", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/alert`, title: "Alert", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/popover`, title: "Popover", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/tooltips`, title: "Tooltips", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/spinner`, title: "Spinner", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/dropdown`, title: "Dropdown", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/accordion`, title: "Accordion", type: "link" ,roles: ["admin"],},
+  //         {
+  //           title: "Tabs",
+  //           type: "sub",
+  //           roles: ["admin"],
+  //       children: [
+  //             { title: "Bootstrap", type: "link", path: `${process.env.PUBLIC_URL}/ui-kits/tabs/bootstrap` ,roles: ["admin"],},
+  //             { title: "Line", type: "link", path: `${process.env.PUBLIC_URL}/ui-kits/tabs/line` ,roles: ["admin"],},
+  //           ],
+  //         },
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/shadow`, title: "Shadow", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/ui-kits/list`, title: "List", type: "link" ,roles: ["admin"],},
+  //       ],
+  //     },
+
+  //     {
+  //       title: "Bonus-Ui",
+  //       icon: "bonus-kit",
+  //       type: "sub",
+  //       badge1: true,
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/scrollable`, title: "Scrollable", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/bootstrap-notify`, title: "Bootstrap-Notify", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/tree-view`, title: "Tree View", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/rating`, title: "Rating", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/dropzone`, title: "Dropzone", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/tour`, title: "Tour ", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/sweet-alert`, title: "Sweet-Alert", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/carousel`, title: "Carousel", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/ribbons`, title: "Ribbons", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/pagination`, title: "Pagination", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/breadcrumb`, title: "Breadcrumb", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/rangeslider`, title: "RangeSlider", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/imagecropper`, title: "ImageCropper", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/stickynotes`, title: "StickyNotes", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/drag_and_drop`, title: "Drag_and_Drop", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/image-upload`, title: "Image-Upload", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/card/basiccards`, title: "BasicCards", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/card/creativecards`, title: "CreativeCards", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/card/tabcard`, title: "TabCard", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/bonus-ui/timelines/timeline1`, title: "Timeline1", type: "link" ,roles: ["admin"],},
+  //       ],
+  //     },
+
+  //     {
+  //       title: "Icons",
+  //       icon: "icons",
+  //       path: `${process.env.PUBLIC_URL}/icons/flag_icons`,
+  //       type: "sub",
+  //       active: false,
+  //       bookmark: true,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/icons/flag_icons`, title: "Flag Icon", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/icons/fontawesome_icon`, title: "Fontawesome Icon", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/icons/ico_icon`, title: "Ico Icon", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/icons/themify_icons`, title: "Themify Icon", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/icons/feather_icons`, title: "Feather Icon", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/icons/weather_icons`, title: "Weather Icons", type: "link" ,roles: ["admin"],},
+  //       ],
+  //     },
+
+  //     {
+  //       title: "Buttons",
+  //       icon: "button",
+  //       type: "sub",
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/buttons/simplebutton`, title: "SimpleButton", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/buttons/flat`, title: "Flat", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/buttons/edge`, title: "Edge", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/buttons/raised`, title: "Raised", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/buttons/group`, title: "Group", type: "link" ,roles: ["admin"],},
+  //       ],
+  //     },
+
+  //     {
+  //       title: "Charts",
+  //       icon: "charts",
+  //       type: "sub",
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/charts/apex`, type: "link", title: "Apex" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/charts/google`, type: "link", title: "Google" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/charts/chartjs`, type: "link", title: "Chartjs" ,roles: ["admin"],},
+  //       ],
+  //     },
+  //   ],
+  // },
+  // {
+  //   menutitle: "Pages",
+  //   menucontent: "All neccesory pages added",
+  //   Items: [
+  //     {roles: ["admin"],
+  //       icon: "sample-page",
+  //       badge2: true,
+  //       active: false,
+  //       path: `${process.env.PUBLIC_URL}/pages/sample-page`,
+  //       title: "Sample-Page",
+  //       type: "link",
+  //     },
+  //     {
+  //       title: "Others",
+  //       icon: "others",
+  //       type: "sub",
+  //       roles: ["admin"],
+  //       children: [
+  //         {
+  //           title: "Error Pages",
+  //           type: "sub",
+  //           roles: ["admin"],
+  //       children: [
+  //             { title: "Error Page 1", type: "link", path: `${process.env.PUBLIC_URL}/pages/errors/error400`,roles: ["admin"], },
+  //             { title: "Error Page 2", type: "link", path: `${process.env.PUBLIC_URL}/pages/errors/error401`,roles: ["admin"], },
+  //             { title: "Error Page 3", type: "link", path: `${process.env.PUBLIC_URL}/pages/errors/error403`,roles: ["admin"], },
+  //             { title: "Error Page 4", type: "link", path: `${process.env.PUBLIC_URL}/pages/errors/error404`,roles: ["admin"], },
+  //             { title: "Error Page 5", type: "link", path: `${process.env.PUBLIC_URL}/pages/errors/error500`,roles: ["admin"], },
+  //             { title: "Error Page 6", type: "link", path: `${process.env.PUBLIC_URL}/pages/errors/error503`,roles: ["admin"], },
+  //           ],
+  //         },
+  //         {
+  //           title: "Authentication",
+  //           type: "sub",
+  //           roles: ["admin"],
+  //       children: [
+  //             { title: "Login Simple", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/login-simple` ,roles: ["admin"],},
+  //             { title: "Login with bg image", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/login-bg-img` ,roles: ["admin"],},
+  //             { title: "Login with image two", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/login-img` ,roles: ["admin"],},
+  //             { title: "Login with validation", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/login-validation` ,roles: ["admin"],},
+  //             { title: "Login with tooltip", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/login-tooltip` ,roles: ["admin"],},
+  //             { title: "Login with sweetalert", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/login-sweetalert` ,roles: ["admin"],},
+  //             { title: "Register Simple", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/register-simple` ,roles: ["admin"],},
+  //             { title: "Register with Bg Image", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/register-bg-img` ,roles: ["admin"],},
+  //             { title: "Register with Bg Video", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/register-video` ,roles: ["admin"],},
+  //             { title: "Unloack User", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/unlock-user` ,roles: ["admin"],},
+  //             { title: "Forget Password", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/forget-pwd` ,roles: ["admin"],},
+  //             { title: "Reset Password", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/create-pwd` ,roles: ["admin"],},
+  //             { title: "Maintenance", type: "link", path: `${process.env.PUBLIC_URL}/pages/authentication/maintenance` ,roles: ["admin"],},
+  //           ],
+  //         },
+  //         {
+  //           title: "Coming Soon",
+  //           type: "sub",
+  //           roles: ["admin"],
+  //       children: [
+  //             { title: "Coming Simple", type: "link", path: `${process.env.PUBLIC_URL}/pages/comingsoon/comingsoon` ,roles: ["admin"],},
+  //             { title: "Coming with Bg Video", type: "link", path: `${process.env.PUBLIC_URL}/pages/comingsoon/coming-bg-video` ,roles: ["admin"],},
+  //             { title: "Coming with bg Image", type: "link", path: `${process.env.PUBLIC_URL}/pages/comingsoon/coming-bg-img` ,roles: ["admin"],},
+  //           ],
+  //         },
+  //       ],
+  //     },
+  //   ],
+  // },
+
+  // {
+  //   menutitle: "Miscellaneous",
+  //   menucontent: "Bouns Pages & Apps",
+  //   Items: [
+  //     {
+  //       title: "Gallery",
+  //       icon: "gallery",
+  //       type: "sub",
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/app/gallery/grids`, title: "Grids", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/app/gallery/griddesc`, title: "GridDesc", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/app/gallery/masonrys`, title: "Masonrys", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/app/gallery/masonrydesc`, title: "MasonryDesc", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/app/gallery/hover_effect`, title: "Hover_Effect", type: "link" ,roles: ["admin"],},
+  //       ],
+  //     },
+
+  //     {
+  //       title: "Blog",
+  //       icon: "blog",
+  //       type: "sub",
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/app/blog/blogdetails`, title: "BlogDetails", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/app/blog/blogsingle`, title: "BlogSingle", type: "link" ,roles: ["admin"],},
+  //         { path: `${process.env.PUBLIC_URL}/app/blog/blogpost`, title: "BlogPost", type: "link" ,roles: ["admin"],},
+  //       ],
+  //     },
+  //     { path: `${process.env.PUBLIC_URL}/app/faq`, icon: "faq", type: "link", active: false, title: "FAQ",roles: ["admin"], },
+  //     {
+  //       title: "JobSearch",
+  //       icon: "job-search",
+  //       type: "sub",
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/app/jobsearch/cardview`, title: "CardView", type: "link" ,roles: ["admin"]},
+  //         { path: `${process.env.PUBLIC_URL}/app/jobsearch/joblist`, title: "JobList", type: "link" ,roles: ["admin"]},
+  //         { path: `${process.env.PUBLIC_URL}/app/jobsearch/jobdetail`, title: "JobDetail", type: "link" ,roles: ["admin"]},
+  //         { path: `${process.env.PUBLIC_URL}/app/jobsearch/jobapply`, title: "JobApply", type: "link" ,roles: ["admin"]},
+  //       ],
+  //     },
+  //     {
+  //       title: "Learning",
+  //       icon: "learning",
+  //       type: "sub",
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/app/learning/learninglist`, title: "LearningList", type: "link" ,roles: ["admin"]},
+  //         { path: `${process.env.PUBLIC_URL}/app/learning/learningdetail`, title: "LearningDetail", type: "link" ,roles: ["admin"]},
+  //       ],
+  //     },
+  //     {
+  //       title: "Map",
+  //       icon: "maps",
+  //       type: "sub",
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/app/map/googlemap`, type: "link", title: "GoogleMap",roles: ["admin"] },
+  //         { path: `${process.env.PUBLIC_URL}/app/map/pigeonmap`, type: "link", title: "PigeonMap",roles: ["admin"] },
+  //       ],
+  //     },
+  //     {
+  //       title: "Editor",
+  //       icon: "editors",
+  //       type: "sub",
+  //       active: false,
+  //       roles: ["admin"],
+  //       children: [
+  //         { path: `${process.env.PUBLIC_URL}/editor/ckeditor`, type: "link", title: "CKEditor",roles: ["admin"] },
+  //         { path: `${process.env.PUBLIC_URL}/editor/mdeeditor`, type: "link", title: "MDEEditor",roles: ["admin"] },
+  //         { path: `${process.env.PUBLIC_URL}/editor/aceeditor`, type: "link", title: "ACEEditor",roles: ["admin"] },
+  //       ],
+  //     },
+
+  //     { path: `${process.env.PUBLIC_URL}/app/knowledgebase`, icon: "knowledgebase", type: "link", active: false, title: "Knowledgebase" ,roles: ["admin"]},
+  //     { path: `${process.env.PUBLIC_URL}/app/supportticket`, icon: "support-tickets", type: "link", active: false, title: "SupportTicket" ,roles: ["admin"]},
+  //   ],
+  // },
+];

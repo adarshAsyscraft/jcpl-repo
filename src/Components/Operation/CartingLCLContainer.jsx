@@ -1,0 +1,1229 @@
+import React, {
+  Fragment,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Breadcrumbs } from "../../AbstractElements";
+import { Col, Container, Row, FormGroup, Label, Input } from "reactstrap";
+import CustomizerContext from "../../_helper/Customizer";
+import { useSelector, useDispatch } from "react-redux";
+import { fetchForwarders } from "../../Redux/slices/forwarderSlice";
+import { fetchContainerByNumber } from "../../Redux/slices/containerSlice";
+import moment from "moment";
+import { toast } from "react-toastify";
+import { fetchYards } from "../../Redux/slices/yardSlice";
+import DynamicForm from "./cartingDynamicField";
+import operationService from "../../Services/operation";
+import { fetchICDs } from "../../Redux/slices/icdsSlice";
+
+const CartingLCLContainer = () => {
+  const dispatch = useDispatch();
+  const { layoutURL } = useContext(CustomizerContext);
+  const location = useLocation();
+  const currentDate = moment().format("DD-MM-YYYY");
+  const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
+
+  const navigate = useNavigate();
+  const {
+    data = [],
+    loading: yardsLoading,
+    error: yardsError,
+  } = useSelector((state) => state.yards || {});
+  const [errors, setErrors] = useState({
+    cartingDate: "",
+    shippingForwarderLine: "",
+    shipBillNumber: "",
+    shipBillDate: "",
+    netWeight: "",
+  });
+
+  const containerNumber = location.state?.containerNumber || "";
+  const selectedOperation = location.state?.operation || "";
+  const { data: forwarders = [] } = useSelector(
+    (state) => state.forwarders || {}
+  );
+  const { icds, loading } = useSelector((state) => state.icd);
+
+  const [ctmList, setCtmList] = useState([
+    {
+      id: Date.now(),
+      recievedCTM: "",
+      length: "",
+      breadth: "",
+      height: "",
+      total: 0,
+    },
+  ]);
+  const [cbm, setCbm] = useState("0.000");
+  const [packages, setPackages] = useState("0");
+  const [rowCount, setRowCount] = useState(0);
+  const [rows, setRows] = useState([]);
+  const [disableFields, setDisableFields] = useState(true);
+
+  const [formData, setFormData] = useState({
+    containerNumber,
+    shippingLine: "",
+    size: "",
+    type: "",
+    tareWeight: "",
+    mgWeight: "",
+    mfdDate: "",
+    cscValidity: "",
+    operation: selectedOperation,
+    forwarder1: "",
+    forwarder2: "",
+    transportMode: "",
+    loadStatus: "",
+    yardName: "",
+    pol: "",
+    shippingLineSeal: "",
+    containerCondition: "",
+    anyOtherCondition: "",
+    ready: "Not Ready",
+    cbm: "0.000",
+    cartingDate: "",
+    shipBillNumber: "",
+    shipBillDate: "",
+    shippingForwarderLine: "",
+    shipper: "",
+    icdDfs: "",
+    sku: "",
+    number: "",
+    cargoCondition: "ok",
+    commencingDateTime: "",
+    completionDateTime: "",
+    getInDateTime: "",
+    reportDateTime: "",
+    truckNumber: "",
+    hsCode: "",
+    ispm: "",
+    readyDate: "",
+    style: "",
+    locationOfCargo: "",
+    marks: "",
+    packedIn: "",
+    packages: "",
+    cargoWeight: "",
+    cargo: "",
+    fpd: "",
+    pod: "",
+    invoiceDate: "",
+    poNumber: "",
+    consignee: "",
+    clearingAgent: "",
+    cartingNumber: "",
+    remarks: "",
+    yardId: "",
+    netWeight: "",
+    invoiceNumber: "",
+    aggrementParty: "",
+    ispmNumber: "",
+  });
+
+  const addMoreCTM = () => {
+    setCtmList((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        recievedCTM: "",
+        length: "",
+        breadth: "",
+        height: "",
+        total: 0,
+      },
+    ]);
+  };
+
+  useEffect(() => {
+    const containerNumber = location.state?.containerNumber || "";
+    if (containerNumber) {
+      dispatch(fetchContainerByNumber(containerNumber));
+    }
+    dispatch(fetchForwarders());
+  }, [dispatch, location.state]);
+
+  useEffect(() => {
+    dispatch(fetchICDs());
+  }, [dispatch]);
+
+  const handleCTMChange = (index, field, value) => {
+    const updatedList = [...ctmList];
+    updatedList[index][field] = value;
+
+    const { recievedCTM, length, breadth, height } = updatedList[index];
+    const total =
+      (parseFloat(recievedCTM || 0) *
+        parseFloat(length || 0) *
+        parseFloat(breadth || 0) *
+        parseFloat(height || 0)) /
+      1000000;
+
+    updatedList[index].total = total.toFixed(3);
+    setCtmList(updatedList);
+
+    const totalCBM = updatedList.reduce(
+      (sum, item) => sum + parseFloat(item.total || 0),
+      0
+    );
+    const totalPackage = updatedList.reduce(
+      (sum, item) => sum + parseFloat(item.recievedCTM || 0),
+      0
+    );
+    setCbm(totalCBM.toFixed(3));
+    setPackages(totalPackage.toFixed(3));
+
+    setFormData((prev) => ({ ...prev, cbm: totalCBM.toFixed(3) }));
+  };
+
+  const removeCTMRow = (index) => {
+    const updatedList = ctmList.filter((_, i) => i !== index);
+    setCtmList(updatedList);
+
+    const totalCBM = updatedList.reduce(
+      (sum, item) => sum + parseFloat(item.total || 0),
+      0
+    );
+    const totalPackage = updatedList.reduce(
+      (sum, item) => sum + parseFloat(item.recievedCTM || 0),
+      0
+    );
+    setCbm(totalCBM.toFixed(3));
+    setPackages(totalPackage.toFixed(3));
+    setFormData((prev) => ({ ...prev, cbm: totalCBM.toFixed(3) }));
+  };
+
+  const handleChange = (e) => {
+    let { name, value } = e.target;
+
+    if (e.target.type == "text") {
+      value = value.toUpperCase();
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    const requiredFields = {
+      shippingForwarderLine:
+        "shippingForwarderLine is required for hazardous cargo",
+      shipBillNumber: "shipBillNumber is required for hazardous cargo",
+      shipBillDate: "shipBillDate is required for hazardous cargo",
+    };
+
+    if (
+      name === "netWeight" &&
+      parseFloat(value) > parseFloat(formData.cargoWeight)
+    ) {
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        netWeight: "Net weight should not be greater than cargo weight",
+      }));
+    } else if (name === "netWeight") {
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        netWeight: "",
+      }));
+    }
+
+    // if (name == "cartingDate" && value > currentDate) {
+    //   setErrors((prevErrors) => ({
+    //     ...prevErrors,
+    //     cartingDate: "Carting Date is not greater than current date",
+    //   }));
+    // } else {
+    //   setErrors((prevErrors) => ({
+    //     ...prevErrors,
+    //     cartingDate: "",
+    //   }));
+    // }
+
+    // 🛠 Required field validation
+    if (requiredFields[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: value ? "" : requiredFields[name],
+      }));
+    }
+  };
+
+  const validateForm = (formData) => {
+    const requiredFields = {
+      shippingForwarderLine:
+        "shippingForwarderLine is required for hazardous cargo",
+      shipBillNumber: "shipBillNumber is required for hazardous cargo",
+      shipBillDate: "shipBillDate is required for hazardous cargo",
+      netWeight: "netWeight is not greater than cargo weight",
+    };
+
+    const newErrors = {};
+
+    Object.entries(requiredFields).forEach(([key, message]) => {
+      if (!formData[key]) {
+        newErrors[key] = message;
+      }
+    });
+
+    return newErrors;
+  };
+
+  const handleSave = async () => {
+    const errors = validateForm(formData);
+
+    const formattedCartingDate = moment(
+      formData.cartingDate,
+      "DD-MM-YYYY"
+    ).format("YYYY-MM-DD");
+
+    const formattedShipBillDate = moment(
+      formData.shipBillDate,
+      "DD-MM-YYYY"
+    ).format("YYYY-MM-DD");
+
+    if (parseFloat(formData.netWeight) > parseFloat(formData.cargoWeight)) {
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        netWeight: "Net weight should not be greater than cargo weight",
+      }));
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setErrors(errors);
+      toast.error("All Fields requireds");
+      return;
+    }
+
+    // Add this datetime formatting function
+    function formatDateTime(dtString) {
+      if (!dtString) return null;
+      return dtString.replace("T", " ") + ":00";
+    }
+
+    const payload = {
+      carting_date: formattedCartingDate,
+      carting_number: formData.cartingNumber || "",
+      shipping_line_forwarder_name: formData?.shippingForwarderLine,
+      shipper: formData.shipper,
+      clearing_agent: formData.clearingAgent,
+      consignee: formData.consignee,
+      agreement_party: formData.aggrementParty,
+      yard: formData.yardId.toString(),
+      ship_bill_number: formData.shipBillNumber,
+      ship_bill_date: formattedShipBillDate,
+      po_number: formData.poNumber,
+      booking_number: formData.bookingNumber,
+      invoice_number: formData.invoiceNumber,
+      invoice_date: moment(formData.invoiceDate, "DD-MM-YYYY").format(
+        "YYYY-MM-DD"
+      ),
+      pod: formData.pod,
+      fpd: formData.fpd,
+      cargo: formData.cargo,
+      cargo_weight: parseFloat(formData.cargoWeight),
+      packages: parseInt(formData.packages),
+      packed_in: formData.packedIn,
+      marks: formData.marks,
+      number: formData.number,
+      cargo_condition: formData.cargoCondition,
+      sku: formData.sku,
+      icd_dfs: formData.icdDfs,
+      location_of_cargo: formData.locationOfCargo,
+      style: formData.style,
+      cartingDimention_data: ctmList.map((ctm) => ({
+        receivedCTM: ctm.recievedCTM,
+        length: ctm.length,
+        breadth: ctm.breadth,
+        height: ctm.height,
+        total: ctm.total,
+      })),
+      cbm: parseFloat(formData.cbm),
+      ready_not_ready: formData.ready,
+      ispmNumber: formData.ispmNumber,
+      ready_date:
+        moment(formData.readyDate, "DD-MM-YYYY").format("YYYY-MM-DD") || null,
+      ispm: formData.ispm || "",
+      hs_code: formData.hsCode,
+      truck_number: formData.truckNumber,
+      reporting_date_time: formData.reportDateTime || null,
+      get_in_date_time: formData.getInDateTime || null,
+      commencing_date_time: formatDateTime(formData.commencingDateTime),
+      completion_date_time: formatDateTime(formData.completionDateTime),
+      remarks: formData.remarks,
+      rows_data: rows.map((res) => ({
+        po: res.po || "",
+        bookingNo: res.bookingNo || "",
+        style: res.style || "",
+        cargoWeight: res.cargoWeight.toString(),
+        packages: res.packages.toString(),
+        packedIn: res.packedIn || "",
+        marks: res.marks || "",
+        cbm: res.cbm.toString(),
+        reportingDateTime: res.reportingDateTime || new Date().toISOString(),
+        truckNo: res.truckNo || "",
+        gateInDateTime: res.gateInDateTime || new Date().toISOString(),
+        commencingDateTime: res.commencingDateTime || new Date().toISOString(),
+        completionDateTime: res.completionDateTime || new Date().toISOString(),
+        remarks: res.remarks || "",
+      })),
+    };
+
+    const response = await operationService.cartingLCL(payload);
+    if (response.success) {
+      toast.success(
+        `YOU HAVE SUCCESSFULLY SAVED CARTING-LCL OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${response.data.id}`
+      );
+      navigate(`${process.env.PUBLIC_URL}/app/operation/Admin`);
+      return;
+    } else {
+      toast.error("Carting LCL Creating failed");
+    }
+  };
+
+  useEffect(() => {
+    dispatch(fetchYards());
+  }, [dispatch]);
+
+  const handleAddRows = () => {
+    const rows = Array.from({ length: Number(rowCount) }, () => ({
+      po: "",
+      bookingNo: "",
+      style: "",
+      cargoWeight: "",
+      packages: "",
+      packedIn: "",
+      marks: "",
+      cbm: "",
+      reportingDateTime: "",
+      truckNo: "",
+      gateInDateTime: "",
+      commencingDateTime: "",
+      completionDateTime: "",
+      remarks: "",
+    }));
+    setRows(rows);
+    setRowCount(0);
+  };
+
+  const handleChangeDynamic = (index, field, value) => {
+    const updatedRows = [...rows];
+    updatedRows[index][field] = value;
+    setRows(updatedRows);
+  };
+
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Allow only DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY using the same separator
+    const isValidFormat =
+      /^(0[1-9]|[12][0-9]|3[01])([-/.])(?:0[1-9]|1[0-2])\2\d{4}$/.test(value);
+
+    // Determine correct format based on separator
+    const matched = value.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/);
+    const separator = matched?.[2];
+    const formatMap = {
+      "-": "DD-MM-YYYY",
+      "/": "DD/MM/YYYY",
+      ".": "DD.MM.YYYY",
+    };
+    const inputDate = moment(value, formatMap[separator], true);
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!value) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Date is required",
+      }));
+    } else if (!isValidFormat || !inputDate.isValid()) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
+      }));
+    } else if (name === "cartingDate") {
+      // Only apply before/after validation for allotmentDate
+      if (inputDate.isAfter(current)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be in the future",
+        }));
+      } else if (inputDate.isBefore(minimum)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be more than 3 days in the past",
+        }));
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: undefined,
+        }));
+      }
+    } else {
+      // For other dates (like shipBillDate), just clear the error if format is valid
+      setErrors((prev) => ({
+        ...prev,
+        [name]: undefined,
+      }));
+    }
+  };
+
+  return (
+    <Fragment>
+      <Breadcrumbs
+        mainTitle="Carting Of Container LCL"
+        parent="Apps"
+        title="Carting Of Container LCL"
+      />
+      <Container fluid={true} className="container-wrap">
+        <Row>
+          <Col sm="12">
+            <div className="card shadow p-4">
+              <div className="shadow-sm p-4  mt-4">
+                <h5 className="mb-3">Client Details</h5>
+                <Row className="mb-3">
+                  {/* <Col md="6">
+                    <label className="">Carting Date</label>
+                    <input className={`form-control ${errors.cartingDate ? 'is-invalid' : ''}`} name="cartingDate" type="date" placeholder="Carting Date" onChange={handleChange} value={formData.cartingDate} />
+                    {errors.cartingDate && (
+                      <div className="invalid-feedback">
+                        {errors.cartingDate}
+                      </div>
+                    )}
+                  </Col> */}
+
+                  <Col md="4">
+                    <label htmlFor="">Carting Date</label>
+                    <input
+                      name="cartingDate"
+                      type="text"
+                      className={`form-control ${
+                        errors.cartingDate ? "is-invalid" : ""
+                      }`}
+                      value={formData.cartingDate}
+                      onChange={handleDateChange}
+                      max={currentDate}
+                      min={minAllowedDate}
+                      placeholder="DD-MM-YYYY"
+                      required
+                    />
+                    {errors.cartingDate && (
+                      <div className="invalid-feedback">
+                        {errors.cartingDate}
+                      </div>
+                    )}
+                  </Col>
+
+                  {/* <Col md="6">
+                    <label className="">Carting Number</label>
+                    <input name="cartingNumber" type="number" className="form-control" placeholder="Carting Number" onChange={handleChange} value={formData.cartingNumber} />
+                  </Col> */}
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">Shipping/Forwarder Name</label>
+                    <select
+                      name="shippingForwarderLine"
+                      className="form-select"
+                      onChange={handleChange}
+                      value={formData.shippingForwarderLine}
+                    >
+                      <option value="">Select Forwarders</option>
+                      {forwarders.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Col>
+                  <Col md="6">
+                    <label className="">Shipper</label>
+                    <input
+                      name="shipper"
+                      type="text"
+                      className="form-control"
+                      placeholder="Shipper"
+                      onChange={handleChange}
+                      value={formData.shipper}
+                    />
+                  </Col>
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">Clearing Agent</label>
+                    <input
+                      name="clearingAgent"
+                      type="text"
+                      className="form-control"
+                      placeholder="Clearing Agent"
+                      onChange={handleChange}
+                      value={formData.clearingAgent}
+                    />
+                  </Col>
+                  <Col md="6">
+                    <label className="">Consignee</label>
+                    <input
+                      name="consignee"
+                      type="text"
+                      className="form-control"
+                      placeholder="Consignee"
+                      onChange={handleChange}
+                      value={formData.consignee}
+                    />
+                  </Col>
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">Aggrement Party</label>
+                    <input
+                      name="aggrementParty"
+                      type="text"
+                      className="form-control"
+                      placeholder="Agreement Party"
+                      onChange={handleChange}
+                      value={formData.aggrementParty}
+                    />
+                  </Col>
+
+                  <Col md="6">
+                    <label>ICD Name</label>
+                    <select
+                      name="icdDfs"
+                      onChange={handleChange}
+                      value={formData.icdDfs}
+                      className={`form-control`}
+                    >
+                      <option value="">Select ICD</option>
+                      {icds.map((icd) => (
+                        <option key={icd.id} value={icd.id}>
+                          {icd.code} - {icd.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Col>
+                </Row>
+              </div>
+              <div className="shadow-sm p-4  mt-4">
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">Ship Bill Number</label>
+                    <input
+                      name="shipBillNumber"
+                      type="text"
+                      placeholder="Ship Bill Number"
+                      className={`form-control ${
+                        errors.shipBillNumber ? "is-invalid" : ""
+                      }`}
+                      onChange={handleChange}
+                      value={formData.shipBillNumber}
+                    />
+                    {errors.shipBillNumber && (
+                      <div className="invalid-feedback">
+                        {errors.shipBillNumber}
+                      </div>
+                    )}
+                  </Col>
+                  <Col md="6">
+                    <label className="">Ship Bill Date</label>
+                    <input
+                      name="shipBillDate"
+                      type="text"
+                      placeholder="DD-MM-YYYY"
+                      className={`form-control ${
+                        errors.shipBillDate ? "is-invalid" : ""
+                      }`}
+                      onChange={handleDateChange}
+                      value={formData.shipBillDate}
+                    />
+
+                    {errors.shipBillDate && (
+                      <div className="invalid-feedback">
+                        {errors.shipBillDate}
+                      </div>
+                    )}
+                  </Col>
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">PO Number</label>
+                    <input
+                      name="poNumber"
+                      type="text"
+                      className="form-control"
+                      placeholder="PO Number"
+                      onChange={handleChange}
+                      value={formData.poNumber}
+                    />
+                  </Col>
+                  <Col md="6">
+                    <label className="">Booking Number</label>
+                    <input
+                      name="bookingNumber"
+                      type="text"
+                      className="form-control"
+                      placeholder="Booking Number"
+                      onChange={handleChange}
+                      value={formData.bookingNumber}
+                    />
+                  </Col>
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">Invoice Number</label>
+                    <input
+                      name="invoiceNumber"
+                      type="text"
+                      className="form-control"
+                      placeholder="Invoice Number"
+                      onChange={handleChange}
+                      value={formData.invoiceNumber}
+                    />
+                  </Col>
+                  <Col md="6">
+                    <label className="">Invoice Date</label>
+                    <input
+                      name="invoiceDate"
+                      type="text"
+                      placeholder="DD-MM-YYYY"
+                      className={`form-control ${
+                        errors.shipBillDate ? "is-invalid" : ""
+                      }`}
+                      onChange={handleDateChange}
+                      value={formData.invoiceDate}
+                      place
+                    />
+                    {errors.invoiceDate && (
+                      <div className="invalid-feedback">
+                        {errors.invoiceDate}
+                      </div>
+                    )}
+                  </Col>
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">POD</label>
+                    <input
+                      name="pod"
+                      type="text"
+                      className="form-control"
+                      placeholder="POD"
+                      onChange={handleChange}
+                      value={formData.pod}
+                    />
+                  </Col>
+                  <Col md="6">
+                    <label className="">FPD</label>
+                    <input
+                      name="fpd"
+                      type="text"
+                      className="form-control"
+                      placeholder="fpd"
+                      onChange={handleChange}
+                      value={formData.fpd}
+                    />
+                  </Col>
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">Cargo</label>
+                    <input
+                      name="cargo"
+                      type="text"
+                      className="form-control"
+                      placeholder="Cargo"
+                      onChange={handleChange}
+                      value={formData.cargo}
+                    />
+                  </Col>
+                  <Col md="6">
+                    <label className="">Cargo Weight</label>
+                    <input
+                      name="cargoWeight"
+                      type="text"
+                      className="form-control"
+                      placeholder="Cargo Weight"
+                      onChange={handleChange}
+                      value={formData.cargoWeight}
+                    />
+                  </Col>
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">Net Weight</label>
+                    <input
+                      name="netWeight"
+                      type="text"
+                      className="form-control"
+                      placeholder="Net Weight"
+                      onChange={handleChange}
+                      value={formData.netWeight}
+                    />
+                    {errors.netWeight && (
+                      <span className="text-danger">{errors.netWeight}</span>
+                    )}
+                  </Col>
+                  <Col md="6">
+                    <label className="">Packages</label>
+                    <input
+                      name="packages"
+                      type="number"
+                      className="form-control"
+                      placeholder="Packages"
+                      onChange={handleChange}
+                      value={formData.packages}
+                    />
+                  </Col>
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">Packed In</label>
+                    <input
+                      name="packedIn"
+                      type="text"
+                      className="form-control"
+                      placeholder="Packed In"
+                      onChange={handleChange}
+                      value={formData.packedIn}
+                    />
+                  </Col>
+                  <Col md="6">
+                    <label className="">Marks</label>
+                    <input
+                      name="marks"
+                      type="text"
+                      className="form-control"
+                      placeholder="Marks"
+                      onChange={handleChange}
+                      value={formData.marks}
+                    />
+                  </Col>
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">Numbers</label>
+                    <input
+                      name="number"
+                      type="text"
+                      className="form-control"
+                      placeholder="Number"
+                      onChange={handleChange}
+                      value={formData.number}
+                    />
+                  </Col>
+                  <Col md="6">
+                    <label className="">Cargo Condition</label>
+                    <select
+                      name="cargoCondition"
+                      className="form-select"
+                      onChange={handleChange}
+                      value={formData.cargoCondition}
+                    >
+                      <option value="">Cargo Condition</option>
+                      <option value="ok">Ok</option>
+                      <option value="damage">Damage</option>
+                    </select>
+                  </Col>
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">SKU</label>
+                    <input
+                      name="sku"
+                      type="text"
+                      className="form-control"
+                      placeholder="SKU"
+                      onChange={handleChange}
+                      value={formData.sku}
+                    />
+                  </Col>
+                  <Col md="6">
+                    <label>Yard Name</label>
+                    <select
+                      name="yardId"
+                      onChange={handleChange}
+                      value={formData.yardId}
+                      className={`form-control`}
+                    >
+                      <option value="">Select Yard</option>
+                      {yardsLoading ? (
+                        <option>Loading...</option>
+                      ) : (
+                        data.map((yard) => (
+                          <option key={yard.id} value={yard.id}>
+                            {yard.name}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </Col>
+                  {/* <Col md="6">
+                    <label className="">ICD/CFS</label>
+                    <input
+                      name="icdDfs"
+                      type="text"
+                      className="form-control"
+                      placeholder="ICD/DFS"
+                      onChange={handleChange}
+                      value={formData.icdDfs}
+                    />
+                  </Col> */}
+                </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <label className="">Location Of Cargo</label>
+                    <input
+                      name="locationOfCargo"
+                      type="text"
+                      className="form-control"
+                      placeholder="Location of Cargo"
+                      onChange={handleChange}
+                      value={formData.locationOfCargo}
+                    />
+                  </Col>
+                  <Col md="6">
+                    <label className="">Style</label>
+                    <input
+                      name="style"
+                      type="text"
+                      className="form-control"
+                      placeholder="Style"
+                      onChange={handleChange}
+                      value={formData.style}
+                    />
+                  </Col>
+                </Row>
+
+                <div className="shadow-sm p-4  mt-4">
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h5 className="mb-0">Cargo Dimension Details</h5>
+                    <div>
+                      <button
+                        className="btn btn-primary me-2"
+                        onClick={addMoreCTM}
+                      >
+                        Add More
+                      </button>
+                      <span className="fw-semibold">
+                        Total Entries: {ctmList.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {ctmList.map((item, index) => (
+                    <Row className="mb-3" key={item.id}>
+                      <Col md="2">
+                        <label>Recieved Packages</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={item.recievedCTM}
+                          onChange={(e) =>
+                            handleCTMChange(
+                              index,
+                              "recievedCTM",
+                              e.target.value
+                            )
+                          }
+                        />
+                      </Col>
+                      <Col md="2">
+                        <label>Length</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={item.length}
+                          onChange={(e) =>
+                            handleCTMChange(index, "length", e.target.value)
+                          }
+                        />
+                      </Col>
+                      <Col md="2">
+                        <label>Breadth</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={item.breadth}
+                          onChange={(e) =>
+                            handleCTMChange(index, "breadth", e.target.value)
+                          }
+                        />
+                      </Col>
+                      <Col md="2">
+                        <label>Height</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={item.height}
+                          onChange={(e) =>
+                            handleCTMChange(index, "height", e.target.value)
+                          }
+                        />
+                      </Col>
+                      <Col md="2">
+                        <label>Total (CBM)</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={item.total}
+                          readOnly
+                        />
+                      </Col>
+                      <Col md="2" className="d-flex align-items-end">
+                        <button
+                          className="btn btn-danger w-100"
+                          onClick={() => removeCTMRow(index)}
+                        >
+                          Cancel
+                        </button>
+                      </Col>
+                    </Row>
+                  ))}
+
+                  <Row className="mb-4">
+                    <Col md="3">
+                      <label>Total(Recieved Packages)</label>
+                      <input
+                        type="text"
+                        className="form-control fw-bold"
+                        value={packages}
+                        readOnly
+                      />
+                    </Col>
+                    <Col md="5"></Col>
+                    <Col md="3">
+                      <label>Total(CBM)</label>
+                      <input
+                        type="text"
+                        className="form-control fw-bold"
+                        value={cbm}
+                        readOnly
+                      />
+                    </Col>
+                    <Col md="1"></Col>
+                  </Row>
+
+                  <div className="d-flex justify-content-end">
+                    <button className="btn btn-success" onClick={handleSave}>
+                      Save & Next
+                    </button>
+                  </div>
+                </div>
+
+                <div className="shadow-sm p-4  mt-2">
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <label className="">Shipper CBM</label>
+                      <input
+                        name="shipperCbm"
+                        type="text"
+                        className="form-control"
+                        placeholder="Shipper CBM"
+                        onChange={handleChange}
+                        value={formData.shipperCbm}
+                      />
+                    </Col>
+                    <Col md="6">
+                      <label className="">Ready / Not Ready</label>
+                      <select
+                        name="ready"
+                        className="form-select"
+                        onChange={handleChange}
+                        value={formData.ready}
+                      >
+                        <option value="Ready">Ready</option>
+                        <option value="Not Ready">Not Ready</option>
+                      </select>
+                    </Col>
+                  </Row>
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <label className="">Ready Date</label>
+                      <input
+                        disabled={formData.ready === "Not Ready"}
+                        name="readyDate"
+                        type="text"
+                        placeholder="DD-MM-YYYY"
+                        className={`form-control ${
+                          errors.shipBillDate ? "is-invalid" : ""
+                        }`}
+                        onChange={handleDateChange}
+                        value={formData.readyDate}
+                      />
+                      {errors.invoiceDate && (
+                        <div className="invalid-feedback">
+                          {errors.invoiceDate}
+                        </div>
+                      )}
+                    </Col>
+                    <Col md="6">
+                      <label className="">ISPM</label>
+                      <select
+                        name="ispm"
+                        className="form-select"
+                        onChange={handleChange}
+                        value={formData.ispm}
+                      >
+                        <option value="">Select ISPM</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    </Col>
+                  </Row>
+                  {formData.ispm == "yes" && (
+                    <Row className="mb-3">
+                      <Col md="6">
+                        <label className="">ISPM Number</label>
+                        <input
+                          name="ispmNumber"
+                          type="text"
+                          className="form-control"
+                          placeholder="ISPM Number"
+                          onChange={handleChange}
+                          value={formData.ispmNumber}
+                        />
+                      </Col>
+                    </Row>
+                  )}
+
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <label className="">Truck Number</label>
+                      <input
+                        name="truckNumber"
+                        type="text"
+                        className="form-control"
+                        placeholder="Truck Number"
+                        onChange={handleChange}
+                        value={formData.truckNumber}
+                      />
+                    </Col>
+                    <Col md="6">
+                      <label className="">HS Code</label>
+                      <input
+                        name="hsCode"
+                        type="text"
+                        className="form-control"
+                        placeholder="HS Code"
+                        onChange={handleChange}
+                        value={formData.hsCode}
+                      />
+                    </Col>
+                  </Row>
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <label className="">FOB Value</label>
+                      <input
+                        name="fobValue"
+                        type="text"
+                        className="form-control"
+                        placeholder="FOB Value"
+                        onChange={handleChange}
+                        value={formData.fobValue}
+                      />
+                    </Col>
+                  </Row>
+                </div>
+              </div>
+              <div className="shadow-sm p-4  mt-4">
+                {/* client ke case me dikhana hai */}
+                {/* <Row className="mb-3">
+                  <Col md="6">
+                    <label>Report Date & Time</label>
+                    <input
+                      name="reportDateTime"
+                      type="datetime-local"
+                      className="form-control"
+                      onChange={handleChange}
+                      value={formData.reportDateTime}
+                    />
+                  </Col>
+                  <Col md="6">
+                    <label>Get In Date & Time</label>
+                    <input
+                      name="getInDateTime"
+                      type="datetime-local"
+                      className="form-control"
+                      onChange={handleChange}
+                      value={formData.getInDateTime}
+                    />
+                  </Col>
+                </Row> */}
+
+                <Row className="mb-3">
+                  <Col md="4">
+                    <FormGroup switch>
+                      <Input
+                        type="switch"
+                        checked={disableFields}
+                        onChange={() => setDisableFields(!disableFields)}
+                      />
+                      <Label check>Disable Date/Remarks</Label>
+                    </FormGroup>
+                  </Col>
+                </Row>
+
+                <Row className="mb-3">
+                  <Col md="4">
+                    <label>Commencing Date & Time</label>
+                    <input
+                      name="commencingDateTime"
+                      type="datetime-local"
+                      className="form-control"
+                      onChange={handleChange}
+                      value={formData.commencingDateTime}
+                      disabled={disableFields}
+                    />
+                  </Col>
+                  <Col md="4">
+                    <label>Completion Date & Time</label>
+                    <input
+                      name="completionDateTime"
+                      type="datetime-local"
+                      className="form-control"
+                      onChange={handleChange}
+                      value={formData.completionDateTime}
+                      disabled={disableFields}
+                    />
+                  </Col>
+                  <Col md="4">
+                    <label>Remarks</label>
+                    <textarea
+                      name="remarks"
+                      className="form-control"
+                      onChange={handleChange}
+                      value={formData.remarks}
+                      disabled={disableFields}
+                    ></textarea>
+                  </Col>
+                </Row>
+              </div>
+
+              <div>
+                <Row>
+                  <DynamicForm
+                    rows={rows}
+                    setRows={setRows}
+                    setRowCount={setRowCount}
+                    handleChangeDynamic={handleChangeDynamic}
+                    handleAddRows={handleAddRows}
+                    disableFields={disableFields}
+                  />
+                </Row>
+              </div>
+              <div className="text-center">
+                <button className="btn btn-primary w-100" onClick={handleSave}>
+                  Save
+                </button>
+              </div>
+            </div>
+          </Col>
+        </Row>
+      </Container>
+    </Fragment>
+  );
+};
+
+export default CartingLCLContainer;
