@@ -12,6 +12,7 @@ import { fetchYards } from "../../Redux/slices/yardSlice";
 import { fetchContainerByNumber } from "../../Redux/slices/containerSlice";
 import moment from "moment";
 import ContainerDetailsSection from "./containerDetails";
+import operationService from "../../Services/operation";
 
 const OffHire = () => {
   const { containerNumber } = useParams();
@@ -19,6 +20,9 @@ const OffHire = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const currentDate = moment().format("DD-MM-YYYY");
+  const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
+  const [errors, setErrors] = useState({});
 
   const selectedOperation = location.state?.operation || "1";
   const {
@@ -71,12 +75,9 @@ const OffHire = () => {
     forwarder1: "",
     forwarder2: "",
     transportMode: "",
-    yardName: "",
-    pol: "",
-    shippingLineSeal: "",
-    otherRemarks: "",
-    loadStatus: "",
-    offHireDate: "", // Added for off-hire date
+    hireFrom: "",
+    hireTo: "",
+    offHireDate: "",
   });
 
   // Update formData when container details are fetched
@@ -122,23 +123,70 @@ const OffHire = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleDateChange = (e) => {
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Allow only DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY using the same separator
+    const isValidFormat =
+      /^(0[1-9]|[12][0-9]|3[01])([-/.])(?:0[1-9]|1[0-2])\2\d{4}$/.test(value);
+
+    // Determine correct format based on separator
+    const matched = value.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/);
+    const separator = matched?.[2];
+    const formatMap = {
+      "-": "DD-MM-YYYY",
+      "/": "DD/MM/YYYY",
+      ".": "DD.MM.YYYY",
+    };
+    const inputDate = moment(value, formatMap[separator], true);
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!value) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Date is required",
+      }));
+    } else if (!isValidFormat || !inputDate.isValid()) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
+      }));
+    } else if (inputDate.isAfter(current)) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Date cannot be in the future",
+      }));
+    } else if (inputDate.isBefore(minimum)) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Date cannot be more than 3 days in the past",
+      }));
+    } else {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: undefined,
+      }));
+    }
+  };
+
   const handleSave = async () => {
     const payload = {
-      ...formData,
-      shippingLineId: parseInt(formData.shippingLineId), // In case it's passed as string
-      mgWeight: parseInt(formData.mgWeight),
-      tareWeight: parseInt(formData.tareWeight),
+      container_id: fetchedContainer.id,
+      hire_from_id: formData.hireFrom,
+      hire_to_id: formData.hireTo,
+      off_hire_date: moment(formData.offHireDate, "DD-MM-YYYY").format(
+        "YYYY-MM-DD"
+      ),
     };
 
     try {
-      const response = await dispatch(
-        createExpectedContainer(payload)
-      ).unwrap();
-      if (
-        response?.data?.message === "Expected container created successfully"
-      ) {
+      const res = await operationService.offHire(payload);
+      if (res.success) {
         toast.success(
-          `YOU HAVE SUCCESSFULLY SAVED OFFHIRE OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${response.data.id}`
+          `YOU HAVE SUCCESSFULLY SAVED OFFHIRE OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${res.data.data.id}`
         );
         navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
       } else {
@@ -181,23 +229,31 @@ const OffHire = () => {
                     <label>Hired Date</label>
                     <input
                       name="offHireDate"
-                      type="month"
-                      className="form-control"
-                      onChange={handleChange}
+                      type="text"
+                      placeholder="DD-MM-YYYY"
+                      className={`form-control ${
+                        errors.offHireDate ? "is-invalid" : ""
+                      }`}
+                      onChange={handleDateChange}
                       value={formData.offHireDate}
                     />
+                    {errors?.offHireDate && (
+                      <div className="invalid-feedback">
+                        {errors.offHireDate}
+                      </div>
+                    )}
                   </Col>
                 </Row>
                 <Row className="mb-3">
                   <Col md="6">
                     <label>Hired From</label>
                     <select
-                      name="forwarder1"
+                      name="hireFrom"
                       className="form-select"
                       onChange={handleChange}
-                      value={formData.forwarder1}
+                      value={formData.hireFrom}
                     >
-                      <option value="">Forwarder1 Code Name</option>
+                      <option value="">Select Shipping Line</option>
                       {forwarders &&
                         forwarders.map((res) => (
                           <option key={res.id} value={res.id}>
@@ -211,12 +267,12 @@ const OffHire = () => {
                   <Col md="6">
                     <label>Hired To</label>
                     <select
-                      name="forwarder2"
+                      name="hireTo"
                       className="form-select"
                       onChange={handleChange}
-                      value={formData.forwarder2}
+                      value={formData.hireTo}
                     >
-                      <option value="">Forwarder2 Code Name</option>
+                      <option value="">Select Shipping Line</option>
                       {forwarders &&
                         forwarders.map((res) => (
                           <option key={res.id} value={res.id}>

@@ -154,6 +154,14 @@ const ArrivalContainer = () => {
       errors.loadStatus = "Load Status is required";
     }
 
+    if (!data.arraival_date) {
+      errors.arraival_date = "Arrival Date is required";
+    }
+
+    if (!data.containerStatus) {
+      errors.containerStatus = "Container Status is required";
+    }
+
     if (data.transportMode === "rail" && !data.wagonNumber) {
       errors.wagonNumber = "Wagon Number is required";
     }
@@ -163,7 +171,7 @@ const ArrivalContainer = () => {
     }
 
     if (!data.yardId) {
-      errors.yardId = "Yard Id is required";
+      errors.yardId = "Yard Name is required";
     }
 
     if (
@@ -179,6 +187,23 @@ const ArrivalContainer = () => {
 
   const handleChange = (e) => {
     let { name, value } = e.target;
+
+    if (name === "arrival_date") {
+      value = value.replace(/\D/g, "");
+      if (value.length > 8) return;
+
+      if (value.length >= 3 && value.length <= 4) {
+        value = value.slice(0, 2) + "-" + value.slice(2);
+      } else if (value.length > 4) {
+        value =
+          value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+      }
+
+      const updatedFormData = { ...formData, [name]: value };
+      setFormData(updatedFormData);
+      return;
+    }
+
     if (
       name == "containerRemarks" ||
       name == "otherRemarks" ||
@@ -206,11 +231,6 @@ const ArrivalContainer = () => {
 
       return updatedForm;
     });
-  };
-
-  const handleSelectChange = (name, value) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setFormErrors((errors) => ({ ...errors, [name]: undefined }));
   };
 
   const handleSave = async () => {
@@ -271,51 +291,52 @@ const ArrivalContainer = () => {
   };
 
   const handleArrivalDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
 
+    // Remove all non-digit characters first
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
+
+    // Update input value
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Allow only DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY using the same separator
-    const isValidFormat =
-      /^(0[1-9]|[12][0-9]|3[01])([-/.])(?:0[1-9]|1[0-2])\2\d{4}$/.test(value);
+    // Only validate when input is fully typed in DD-MM-YYYY format
+    if (value.length === 10) {
+      const inputDate = moment(value, "DD-MM-YYYY", true);
+      const current = moment(currentDate, "DD-MM-YYYY");
+      const minimum = moment(minAllowedDate, "DD-MM-YYYY");
 
-    // Determine correct format based on separator
-    const matched = value.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/);
-    const separator = matched?.[2];
-    const formatMap = {
-      "-": "DD-MM-YYYY",
-      "/": "DD/MM/YYYY",
-      ".": "DD.MM.YYYY",
-    };
-    const inputDate = moment(value, formatMap[separator], true);
-    const current = moment(currentDate, "DD-MM-YYYY");
-    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
-
-    if (!value) {
-      setFormErrors((prev) => ({
-        ...prev,
-        [name]: "Arrival Date is required",
-      }));
-    } else if (!isValidFormat || !inputDate.isValid()) {
-      setFormErrors((prev) => ({
-        ...prev,
-        [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
-      }));
-    } else if (inputDate.isAfter(current)) {
-      setFormErrors((prev) => ({
-        ...prev,
-        [name]: "Arrival Date cannot be in the future",
-      }));
-    } else if (inputDate.isBefore(minimum)) {
-      setFormErrors((prev) => ({
-        ...prev,
-        [name]: "Arrival Date cannot be more than 3 days in the past",
-      }));
+      if (!inputDate.isValid()) {
+        setFormErrors((prev) => ({
+          ...prev,
+          [name]: "Invalid date format (DD-MM-YYYY)",
+        }));
+      } else if (inputDate.isAfter(current)) {
+        setFormErrors((prev) => ({
+          ...prev,
+          [name]: "Arrival Date cannot be in the future",
+        }));
+      } else if (inputDate.isBefore(minimum)) {
+        setFormErrors((prev) => ({
+          ...prev,
+          [name]: "Arrival Date cannot be more than 3 days in the past",
+        }));
+      } else {
+        setFormErrors((prev) => ({ ...prev, [name]: undefined }));
+      }
     } else {
-      setFormErrors((prev) => ({
-        ...prev,
-        [name]: undefined,
-      }));
+      // Don't show error while typing incomplete date
+      setFormErrors((prev) => ({ ...prev, [name]: undefined }));
     }
   };
 

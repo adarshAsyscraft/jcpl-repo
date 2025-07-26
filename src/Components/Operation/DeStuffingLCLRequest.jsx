@@ -105,11 +105,11 @@ const DestuffLclRequest = () => {
     () => [
       { name: "consigneeName", label: "Consignee Name" },
       { name: "bl/AwnNumber", label: "BL/AWN Number" },
-      { name: "blAwnDate", label: "BL/AWN Date", type: "date" },
+      { name: "blAwnDate", label: "BL/AWN Date", type: "text" },
       { name: "igmNo", label: "IGM No" },
-      { name: "igmDate", label: "IGM Date", type: "date" },
+      { name: "igmDate", label: "IGM Date", type: "text" },
       { name: "tpNo", label: "TP No" },
-      { name: "tpDate", label: "TP Date", type: "date" },
+      { name: "tpDate", label: "TP Date", type: "text" },
       { name: "cargo", label: "Cargo" },
       {
         name: "cargoWeight (in kg)",
@@ -193,6 +193,62 @@ const DestuffLclRequest = () => {
     }
   }, [containerData, selectedOperation]);
 
+  const formatDateInput = (value) => {
+    if (!value) return value;
+
+    // Remove all non-digit characters
+    let digits = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (digits.length > 8) digits = digits.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (digits.length >= 5) {
+      return (
+        digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4)
+      );
+    } else if (digits.length >= 3) {
+      return digits.slice(0, 2) + "-" + digits.slice(2);
+    }
+
+    return digits;
+  };
+
+  const validateDateField = (dateStr) => {
+    if (!dateStr) return null;
+
+    // Only validate if the string is complete (DD-MM-YYYY = 10 chars)
+    if (dateStr.length < 10) return null;
+
+    const isValidFormat =
+      /^(0[1-9]|[12][0-9]|3[01])([-/.])(0[1-9]|1[0-2])\2\d{4}$/.test(dateStr);
+
+    if (!isValidFormat) {
+      return "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format";
+    }
+
+    const separator = dateStr.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/)[2];
+    const formatMap = {
+      "-": "DD-MM-YYYY",
+      "/": "DD/MM/YYYY",
+      ".": "DD.MM.YYYY",
+    };
+    const format = formatMap[separator] || "DD-MM-YYYY";
+
+    const inputDate = moment(dateStr, format, true);
+    const currentDateObj = moment();
+
+    if (!inputDate.isValid()) {
+      return "Invalid date";
+    }
+
+    if (inputDate.isAfter(currentDateObj)) {
+      return "Date cannot be in the future";
+    }
+
+    return null;
+  };
+
   // Fetch arrival data
   const getPreviousContainerDetails = useCallback(async () => {
     try {
@@ -275,31 +331,6 @@ const DestuffLclRequest = () => {
   // Field change handlers
   const handleChange1 = () => {};
 
-  // const handleChange2 = useCallback((field, value) => {
-
-  //   setFormData2((prev) => {
-  //     const updated = { ...prev, [field]: value };
-
-  //     // Clear error if exists
-  //     setFormErrors((errors) => ({ ...errors, [field]: undefined }));
-
-  //     // Special validation only for forwarders
-  //     if (field === "forwarder1" || field === "forwarder2") {
-  //       if (
-  //         (field === "forwarder1" && value === prev.forwarder2) ||
-  //         (field === "forwarder2" && value === prev.forwarder1)
-  //       ) {
-  //         setFormErrors((prev) => ({
-  //           ...prev,
-  //           forwarder2: "Forwarder 1 and Forwarder 2 cannot be the same",
-  //         }));
-  //       }
-  //     }
-
-  //     return updated;
-  //   });
-  // }, []);
-
   const handleChange2 = useCallback((field, value) => {
     const upperValue = toUpperCase(value);
 
@@ -326,96 +357,48 @@ const DestuffLclRequest = () => {
     });
   }, []);
 
-  // const handleChange = useCallback((index, field, value) => {
-  //   setFormList((prevForms) =>
-  //     prevForms.map((form, i) => {
-  //       if (i !== index) return form;
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.destuffDate) {
+      newErrors.destuffDate = "Destuff Date is required";
+    }
 
-  //       const updatedForm = { ...form, [field]: value };
-
-  //       // Date validation for fields with "date" in name
-  //       if (field.toLowerCase().includes("date")) {
-  //         const isValidFormat =
-  //           /^(0[1-9]|[12][0-9]|3[01])([-/.])(?:0[1-9]|1[0-2])\2\d{4}$/.test(
-  //             value
-  //           );
-  //         const matched = value.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/);
-  //         const separator = matched?.[2];
-  //         const formatMap = {
-  //           "-": "DD-MM-YYYY",
-  //           "/": "DD/MM/YYYY",
-  //           ".": "DD.MM.YYYY",
-  //         };
-
-  //         const inputDate = moment(value, formatMap[separator], true);
-  //         const current = moment(currentDate, "DD-MM-YYYY");
-  //         const minimum = moment(minAllowedDate, "YYYY-MM-DD");
-
-  //         if (!value) {
-  //           updatedForm[`${field}Error`] = "Date is required";
-  //         } else if (!isValidFormat || !inputDate.isValid()) {
-  //           updatedForm[`${field}Error`] = "Invalid date format";
-  //         } else if (inputDate.isAfter(current)) {
-  //           updatedForm[`${field}Error`] = "Date cannot be in the future";
-  //         } else if (inputDate.isBefore(minimum)) {
-  //           updatedForm[`${field}Error`] =
-  //             "Date cannot be more than 3 days in the past";
-  //         } else {
-  //           updatedForm[`${field}Error`] = undefined;
-  //         }
-  //       }
-
-  //       // Excess/Short logic
-  //       if (field === "qtyManifest" || field === "destuff") {
-  //         const qty = parseInt(updatedForm.qtyManifest || "0", 10);
-  //         const destuff = parseInt(updatedForm.destuff || "0", 10);
-  //         updatedForm["excess/short"] = (destuff - qty).toString();
-  //       }
-
-  //       return updatedForm;
-  //     })
-  //   );
-  // }, []);
-
-  // Calculate totals whenever formList changes
+    setFormErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleChange = useCallback((index, field, value) => {
-    const upperValue = toUpperCase(value);
+    // List of date fields
+    const dateFields = ["blAwnDate", "igmDate", "tpDate"];
+    const isDateField = dateFields.includes(field);
+
+    let processedValue = value;
+
+    if (isDateField) {
+      // Format date as user types (DD-MM-YYYY)
+      processedValue = formatDateInput(value);
+    } else if (typeof value === "string") {
+      // Convert all other string fields to uppercase
+      processedValue = value.toUpperCase();
+    }
 
     setFormList((prevForms) =>
       prevForms.map((form, i) => {
         if (i !== index) return form;
 
-        const updatedForm = { ...form, [field]: upperValue };
+        const updatedForm = { ...form, [field]: processedValue };
 
-        // Date validation for fields with "date" in name
-        if (field.toLowerCase().includes("date")) {
-          const isValidFormat =
-            /^(0[1-9]|[12][0-9]|3[01])([-/.])(?:0[1-9]|1[0-2])\2\d{4}$/.test(
-              upperValue
-            );
-          const matched = upperValue.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/);
-          const separator = matched?.[2];
-          const formatMap = {
-            "-": "DD-MM-YYYY",
-            "/": "DD/MM/YYYY",
-            ".": "DD.MM.YYYY",
-          };
-
-          const inputDate = moment(upperValue, formatMap[separator], true);
-          const current = moment(currentDate, "DD-MM-YYYY");
-          const minimum = moment(minAllowedDate, "YYYY-MM-DD");
-
-          if (!upperValue) {
-            updatedForm[`${field}Error`] = "Date is required";
-          } else if (!isValidFormat || !inputDate.isValid()) {
-            updatedForm[`${field}Error`] = "Invalid date format";
+        // Only validate date fields when fully entered (10 chars)
+        if (isDateField && processedValue.length === 10) {
+          const dateError = validateDateField(processedValue);
+          if (dateError) {
+            updatedForm[`${field}Error`] = dateError;
           } else {
-            updatedForm[`${field}Error`] = undefined;
+            delete updatedForm[`${field}Error`];
           }
         }
 
-        // Excess/Short logic
+        // Excess/Short calculation
         if (field === "qtyManifest" || field === "destuff") {
           const qty = parseInt(updatedForm.qtyManifest || "0", 10);
           const destuff = parseInt(updatedForm.destuff || "0", 10);
@@ -473,6 +456,10 @@ const DestuffLclRequest = () => {
 
   // Form submission
   const handleSave = useCallback(async () => {
+    if (!validateForm()) {
+      Object.values(errors).forEach((error) => toast.error(error));
+      return;
+    }
     const errors = {};
 
     const formattedDestuffDate = moment(
@@ -588,7 +575,20 @@ const DestuffLclRequest = () => {
   }, []);
 
   const handleDestuffRequestDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -607,6 +607,7 @@ const DestuffLclRequest = () => {
     const inputDate = moment(value, formatMap[separator], true);
     const current = moment(currentDate, "DD-MM-YYYY");
     const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+    const arrival = moment(arrivalData?.arraival_date, "DD-MM-YYYY");
 
     if (!value) {
       setFormErrors((prev) => ({
@@ -628,6 +629,11 @@ const DestuffLclRequest = () => {
       setFormErrors((prev) => ({
         ...prev,
         [name]: "Destuff Date cannot be more than 3 days in the past",
+      }));
+    } else if (inputDate.isBefore(arrival)) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "Destuff Date cannot be before the arrival Date",
       }));
     } else {
       setFormErrors((prev) => ({

@@ -107,7 +107,16 @@ const operationService = {
   updateCartingDetail: (id, data) => request.patch(`/cartingLcl/${id}`, data),
   updateCarting: (id, data) => request.patch(`/cartingLcl/${id}`, data),
   deleteCartingDetail: (id) => request.delete(`/cartingLcl/${id}`),
-  updateStuffingLcl: (id) => request.out(`/stuffing-lcl/${id}`),
+  updateStuffingLcl: (id, data) => request.put(`/stuffing-lcl/${id}`, data),
+  getMeasurementRateData: (id, data) =>
+    request.post(`/measurement-rate/${id}/typeOfRate`, data),
+  getByContainerNumber: (id) =>
+    request.get(`/stuffing-lcl/getByContainerNo/${id}`),
+  offHire: (data) => request.post(`/off-hire`, data),
+  onHire: (data) => request.post(`/on-hire`, data),
+  onHireSurvey: (data) => request.post(`/on-hire/servey/create`, data),
+  getStuffingLCLProceedDetail: (id) =>
+    request.get(`/stuffing-lcl/stuffing-procced/${id}`),
 };
 
 export default operationService;

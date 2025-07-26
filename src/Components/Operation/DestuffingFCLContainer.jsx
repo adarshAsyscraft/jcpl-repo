@@ -33,7 +33,7 @@ const FIELDS_CONFIG = [
   { name: "packedIn", label: "Packed In" },
   { name: "qtyManifest", label: "Qty Manifest" },
   { name: "destuff", label: "Destuff" },
-  { name: "excessShort", label: "Excess/Short" },
+  { name: "excess/short", label: "Excess/Short" },
   { name: "marks", label: "Marks" },
   { name: "number", label: "Number" },
   { name: "remarks", label: "Remarks" },
@@ -289,7 +289,7 @@ const DestuffFclContainer = () => {
   // Helper functions
   const getInputType = (field) => {
     const lowerField = field.toLowerCase();
-    if (lowerField.includes("date")) return "date";
+    if (lowerField.includes("date")) return "text";
     if (
       lowerField.includes("number") ||
       lowerField.includes("weight") ||
@@ -321,7 +321,7 @@ const DestuffFclContainer = () => {
         packedIn: "",
         qtyManifest: "0",
         destuff: "0",
-        excessShort: "",
+        "excess/short": "",
         marks: "",
         number: "",
         remarks: "",
@@ -331,29 +331,25 @@ const DestuffFclContainer = () => {
   };
 
   const handleChange2 = (field, value) => {
-    const updatedFormData = { ...formData2, [field]: value };
+    // List of fields that should NOT be converted to uppercase (date fields)
+    const nonUpperCaseFields = ["destuffDate", "sealCuttingDate"];
+    const shouldUpperCase =
+      typeof value === "string" && !nonUpperCaseFields.includes(field);
+
+    // Convert to uppercase if applicable
+    const processedValue = shouldUpperCase ? value.toUpperCase() : value;
+
+    // Update form data
+    const updatedFormData = { ...formData2, [field]: processedValue };
     setFormData2(updatedFormData);
 
+    // Handle forwarder validation
     const errors = { ...formErrors };
-
-    if (field === "destuffDate") {
-      if (!value) {
-        errors.destuffDate = "Destuff Date is required";
-      } else if (moment(value).isAfter(currentDate)) {
-        errors.destuffDate = "Destuff Date cannot be greater than current date";
-      } else if (moment(value).isBefore(minAllowedDate)) {
-        errors.destuffDate =
-          "Destuff Date cannot be more than 3 days before current date";
-      } else {
-        delete errors.destuffDate;
-      }
-    }
-
     if (field === "forwarder1" || field === "forwarder2") {
       const forwarder1 =
-        field === "forwarder1" ? value : updatedFormData.forwarder1;
+        field === "forwarder1" ? processedValue : updatedFormData.forwarder1;
       const forwarder2 =
-        field === "forwarder2" ? value : updatedFormData.forwarder2;
+        field === "forwarder2" ? processedValue : updatedFormData.forwarder2;
 
       if (forwarder1 && forwarder2 && forwarder1 === forwarder2) {
         errors.forwarder2 = "Forwarder 1 and Forwarder 2 cannot be the same";
@@ -365,23 +361,122 @@ const DestuffFclContainer = () => {
     setFormErrors(errors);
   };
 
-  const handleChange = (index, field, value) => {
+  // const handleChange = (index, field, value) => {
+  //   setFormList((prevForms) =>
+  //     prevForms.map((form, i) => {
+  //       if (i !== index) return form;
+
+  //       const updatedForm = { ...form, [field]: value };
+
+  //       if (field === "qtyManifest" || field === "destuff") {
+  //         const qty = parseInt(updatedForm.qtyManifest || "0", 10);
+  //         const destuff = parseInt(updatedForm.destuff || "0", 10);
+  //         updatedForm.excessShort = (destuff - qty).toString();
+  //       }
+
+  //       return updatedForm;
+  //     })
+  //   );
+  // };
+
+  const formatDateInput = (value) => {
+    if (!value) return value;
+
+    // Remove all non-digit characters
+    let digits = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (digits.length > 8) digits = digits.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (digits.length >= 5) {
+      return (
+        digits.slice(0, 2) + "-" + digits.slice(2, 4) + "-" + digits.slice(4)
+      );
+    } else if (digits.length >= 3) {
+      return digits.slice(0, 2) + "-" + digits.slice(2);
+    }
+
+    return digits;
+  };
+
+  const validateDateField = (dateStr) => {
+    if (!dateStr) return null;
+
+    // Only validate if the string is complete (DD-MM-YYYY = 10 chars)
+    if (dateStr.length < 10) return null;
+
+    const isValidFormat =
+      /^(0[1-9]|[12][0-9]|3[01])([-/.])(0[1-9]|1[0-2])\2\d{4}$/.test(dateStr);
+
+    if (!isValidFormat) {
+      return "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format";
+    }
+
+    const separator = dateStr.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/)[2];
+    const formatMap = {
+      "-": "DD-MM-YYYY",
+      "/": "DD/MM/YYYY",
+      ".": "DD.MM.YYYY",
+    };
+    const format = formatMap[separator] || "DD-MM-YYYY";
+
+    const inputDate = moment(dateStr, format, true);
+    const currentDateObj = moment();
+
+    if (!inputDate.isValid()) {
+      return "Invalid date";
+    }
+
+    if (inputDate.isAfter(currentDateObj)) {
+      return "Date cannot be in the future";
+    }
+
+    return null;
+  };
+
+  const handleChange = useCallback((index, field, value) => {
+    // List of date fields
+    const dateFields = ["blAwnDate", "invoiceDate"];
+    const isDateField = dateFields.includes(field);
+
+    let processedValue = value;
+
+    if (isDateField) {
+      // Format date as user types (DD-MM-YYYY)
+      processedValue = formatDateInput(value);
+    } else if (typeof value === "string") {
+      // Convert all other string fields to uppercase
+      processedValue = value.toUpperCase();
+    }
+
     setFormList((prevForms) =>
       prevForms.map((form, i) => {
         if (i !== index) return form;
 
-        const updatedForm = { ...form, [field]: value };
+        const updatedForm = { ...form, [field]: processedValue };
 
+        // Only validate date fields when fully entered (10 chars)
+        if (isDateField && processedValue.length === 10) {
+          const dateError = validateDateField(processedValue);
+          if (dateError) {
+            updatedForm[`${field}Error`] = dateError;
+          } else {
+            delete updatedForm[`${field}Error`];
+          }
+        }
+
+        // Excess/Short calculation
         if (field === "qtyManifest" || field === "destuff") {
           const qty = parseInt(updatedForm.qtyManifest || "0", 10);
           const destuff = parseInt(updatedForm.destuff || "0", 10);
-          updatedForm.excessShort = (destuff - qty).toString();
+          updatedForm["excess/short"] = (destuff - qty).toString();
         }
 
         return updatedForm;
       })
     );
-  };
+  }, []);
 
   const cancelForm = (index) => {
     setFormList((prevForms) =>
@@ -398,16 +493,6 @@ const DestuffFclContainer = () => {
   const handleSave = async () => {
     setIsLoading(true);
     const errors = { ...formErrors };
-
-    // Validation
-    // if (!formData2.destuffDate) {
-    //   errors.destuffDate = "Destuff Date is required";
-    // } else if (moment(formData2.destuffDate).isAfter(currentDate)) {
-    //   errors.destuffDate = "Destuff Date cannot be greater than current date";
-    // } else if (moment(formData2.destuffDate).isBefore(minAllowedDate)) {
-    //   errors.destuffDate =
-    //     "Destuff Date cannot be more than 3 days before current date";
-    // }
 
     if (
       formData2.forwarder1 &&
@@ -479,7 +564,7 @@ const DestuffFclContainer = () => {
         packedIn: item.packedIn,
         qtyManifest: parseInt(item.qtyManifest, 10),
         destuff: parseInt(item.destuff, 10),
-        excessShort: item.excessShort || "",
+        excessShort: item.excessShort || item["excess/short"] || "",
         marks: item.marks,
         number: item.number,
         remarks: item.remarks,
@@ -865,13 +950,24 @@ const DestuffFclContainer = () => {
                                 handleChange(index, name, e.target.value)
                               }
                               className="form-control"
-                              readOnly={name === "excessShort"}
+                              readOnly={name === "excess/short"}
                               style={
                                 getInputType(name) === "number"
                                   ? { appearance: "textfield" }
                                   : {}
                               }
+                              placeholder={
+                                getInputType(name) === "text" &&
+                                name.toLowerCase().includes("date")
+                                  ? "DD-MM-YYYY"
+                                  : ""
+                              }
                             />
+                            {form[`${name}Error`] && (
+                              <span className="text-danger">
+                                {form[`${name}Error`]}
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>

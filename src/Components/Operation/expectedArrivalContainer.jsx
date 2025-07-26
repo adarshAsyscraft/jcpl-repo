@@ -105,6 +105,9 @@ const ExpectedArrivalContainer = () => {
     if (!data.loadStatus) {
       newErrors.loadStatus = "Load status is required";
     }
+    if (!data.yardName) {
+      newErrors.yardName = "Yard Name is required";
+    }
 
     if (data.transportMode === "road" && !data.transporter) {
       newErrors.transporter = "Transporter is required for Road transport";

@@ -29,6 +29,8 @@ function StuffingProcessFetchDetails({
   const [errors, setErrors] = useState({});
   const { Option } = Select;
   const [previousPageData, setPreviousPageData] = useState({});
+  const [stuffingData, setStuggingData] = useState({});
+  const [allotmentData, setAllotmentData] = useState({});
   const navigate = useNavigate();
   const currentDate = moment().format("DD-MM-YYYY");
   const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
@@ -91,34 +93,107 @@ function StuffingProcessFetchDetails({
   }, [fetchedContainer]);
 
   const getPreviousData = async () => {
-    let res;
-    let lastOp = localStorage.getItem("operation");
+    const lastOp = localStorage.getItem("operation");
     const containerNumber = fetchedContainer?.container_number;
-    if (lastOp == "19") {
-      res = await operationService.allotmentStuffingDetailsByContainerNo(
-        containerNumber
-      );
-      if (res.success) {
-        setPreviousPageData(res.data);
+    if (!containerNumber) return;
+
+    try {
+      let stuffingRes = null;
+      let allotmentRes = null;
+
+      if (lastOp == "19") {
+        allotmentRes =
+          await operationService.allotmentStuffingDetailsByContainerNo(
+            containerNumber
+          );
+        if (allotmentRes.success) {
+          setAllotmentData(allotmentRes.data);
+        }
+      } else if (lastOp == "9") {
+        stuffingRes = await operationService.getStuffingLclDetails(
+          containerNumber
+        );
+        allotmentRes =
+          await operationService.allotmentStuffingDetailsByContainerNo(
+            containerNumber
+          );
+
+        const stuffing =
+          stuffingRes?.success && stuffingRes?.data?.length > 0
+            ? stuffingRes.data[0]
+            : null;
+        const allotment = allotmentRes?.success ? allotmentRes.data : null;
+
+        if (stuffing) setStuggingData(stuffing);
+        if (allotment) setAllotmentData(allotment);
+
+        // Now set formData conditionally
+        const hasAllotment = allotment && Object.keys(allotment).length > 0;
+
+        setFormData((prev) => ({
+          ...prev,
+          cargoCategory: hasAllotment
+            ? allotment.cargo_category
+            : stuffing?.cargo_category,
+          unNumber: hasAllotment ? allotment.un_number : stuffing?.un_number,
+          imoNumber: hasAllotment ? allotment.imo_number : stuffing?.imo_number,
+          temperature: hasAllotment
+            ? allotment.temperature
+            : stuffing?.temperature,
+          bookingNo: hasAllotment ? allotment.booking_no : stuffing?.booking_no,
+          yardId: hasAllotment ? allotment.yard_id : stuffing?.yard_id,
+          pol: stuffing?.pol || "",
+          pod: stuffing?.pod || "",
+          dischargePortName:
+            stuffing?.discharge_port_name || stuffing?.pod || "",
+          fpd: stuffing?.fpd || "",
+          pdaAccount: hasAllotment
+            ? allotment.pda_account
+            : stuffing?.pda_account,
+          aggrementParty: hasAllotment
+            ? allotment.agreement_party
+            : stuffing?.agreement_party,
+          vesselViaNumber: hasAllotment
+            ? allotment.vessel_via_no
+            : stuffing?.vessel_via_no,
+          placeOfHandOver: hasAllotment
+            ? allotment.place_of_handover
+            : stuffing?.place_of_handover,
+          shipline: stuffing?.ship_line || stuffing?.shipping_line_seal || "",
+          custom: stuffing?.custom || stuffing?.custom_seal || "",
+          other: hasAllotment ? allotment.other : stuffing?.other,
+          otherSealRemarks: hasAllotment
+            ? allotment.other_seal_desc
+            : stuffing?.other_seal_desc,
+          remarks: hasAllotment ? allotment.remark : stuffing?.remark,
+        }));
       }
-    } else if (lastOp == "9") {
-      res = await operationService.getStuffingLclDetails(containerNumber);
-    }
-    if (res.success && res.data.length > 0) {
-      setPreviousPageData(res.data[0]);
+    } catch (error) {
+      console.error("Error fetching previous data:", error);
     }
   };
 
   const fetchCartingDetails = async () => {
     try {
+      const containerNumber = fetchedContainer?.container_number;
+
       const queryParams = {
-        containerNumber: fetchedContainer.container_number || containerNumber,
+        containerNumber,
       };
-      console.log("Container NUmber::", formData.containerNumber);
+
+      if (!containerNumber) {
+        console.warn("No container number found. Skipping fetch.");
+        return;
+      }
+
+      console.log("Fetching carting details for:", containerNumber);
+
       const res = await operationService.getCartingDetails(queryParams);
+
+      console.log("Carting details response:", res);
+
       if (res.success) {
-        setDataByCartingNumber(res.data);
-        console.log("Carting detail::", res.data);
+        setDataByCartingNumber(res.data || {});
       } else {
         toast.error(res.message || "Failed to fetch carting details");
       }
@@ -129,63 +204,9 @@ function StuffingProcessFetchDetails({
   };
 
   useEffect(() => {
+    fetchCartingDetails();
     getPreviousData();
-    fetchCartingDetails();
-  }, [containerNumber]);
-
-  useEffect(() => {
-    setFormData((prev) => ({
-      ...prev,
-      // stuffingDate: moment(previousPageData?.inDate).format("DD-MM-YYYY"),
-      cargoCategory: previousPageData.cargo_category,
-      unNumber: previousPageData.un_number,
-      imoNumber: previousPageData.imo_number,
-      temperature: previousPageData.temperature,
-      bookingNo: previousPageData.booking_no,
-      yardId: previousPageData.yard_id,
-      pol: previousPageData.pol,
-      pod: previousPageData.pod,
-      dischargePortName:
-        previousPageData.discharge_port_name || previousPageData.pod || null,
-      fpd: previousPageData.fpd,
-      pdaAccount: previousPageData.pda_account,
-      aggrementParty: previousPageData?.agreement_party,
-      // vgmByShipper: previousPageData?.shipper,
-      vesselViaNumber: previousPageData.vessel_via_no,
-      placeOfHandOver: previousPageData.place_of_handover,
-      shipline:
-        previousPageData.ship_line ||
-        previousPageData.shipping_line_seal ||
-        null,
-      custom: previousPageData.custom || previousPageData.custom_seal || null,
-      other: previousPageData.other,
-      otherSealRemarks: previousPageData.other_seal_desc,
-      remarks: previousPageData.remark,
-    }));
-  }, [previousPageData]);
-
-  useEffect(() => {
-    const fetchCartingDetails = async () => {
-      if (!fetchedContainer?.container_number) return;
-      try {
-        const res = await operationService.cartingDetailsByContainerNo(
-          fetchedContainer.container_number
-        );
-        if (res.success) {
-          setDataByCartingNumber(res.data?.data || []);
-        } else {
-          setDataByCartingNumber([]);
-          toast.error(res.message || "Failed to fetch carting details");
-        }
-      } catch (error) {
-        setDataByCartingNumber([]);
-        toast.error("Error fetching carting details");
-        console.error(error);
-      }
-    };
-
-    fetchCartingDetails();
-  }, [fetchedContainer?.container_number]);
+  }, [containerNumber, fetchedContainer?.container_number]);
 
   const handleChange = (e) => {
     let { name, value } = e.target;
@@ -199,11 +220,6 @@ function StuffingProcessFetchDetails({
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSelectChange = (name, value) => {
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((errors) => ({ ...errors, [name]: undefined }));
   };
 
   const handleDateChange = (e) => {
@@ -258,6 +274,7 @@ function StuffingProcessFetchDetails({
   const handleSubmit = async () => {
     try {
       const payload = {
+        container_id: fetchedContainer.id,
         shippingLine: formData.shippingLine || null,
         forwarder1: formData.forwarder1 || null,
         forwarder2: formData.forwarder2 || null,
@@ -287,7 +304,10 @@ function StuffingProcessFetchDetails({
       };
       const res = await operationService.stuffingProceed(payload);
       if (res.success) {
-        toast.success("Stuffing Proceed Created Successfully");
+        toast.success(
+          `YOU HAVE SUCCESSFULLY SAVED STUFFING-LCL OPERATION FOR ${fetchedContainer?.container_number}. WHERE ENTRY ID IS ${res.data.id}`
+        );
+        localStorage.setItem("operation", 24);
         navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
       }
     } catch (error) {
@@ -478,7 +498,7 @@ function StuffingProcessFetchDetails({
                       >
                         <option value="">Select Forwarder1 Code Name</option>
                         {forwarders
-                          .filter((res) => res.category == "shipping")
+                          .filter((res) => res.category == "forwarder")
                           .map((item) => (
                             <option key={item.id} value={item.id}>
                               {item.name}
@@ -497,7 +517,7 @@ function StuffingProcessFetchDetails({
                       >
                         <option value="">Select Forwarder2 Code Name</option>
                         {forwarders
-                          .filter((res) => res.category == "shipping")
+                          .filter((res) => res.category == "forwarder")
                           .map((item) => (
                             <option key={item.id} value={item.id}>
                               {item.name}

@@ -166,6 +166,48 @@ const AllotmentStuffing = () => {
       }));
     }
 
+    // New validation for cargo category dependent fields
+    if (name === "cargoCategory") {
+      const newErrors = { ...errors };
+
+      if (value === "hazardous" || value === "both") {
+        if (!formData.imoNumber) newErrors.imoNumber = "IMO Number is required";
+        if (!formData.unNumber) newErrors.unNumber = "UN Number is required";
+      }
+
+      if (value === "refer" || value === "both") {
+        if (!formData.temperature)
+          newErrors.temperature = "Temperature is required";
+      }
+
+      setErrors(newErrors);
+    }
+
+    // Also validate dependent fields when they change
+    if (name === "imoNumber" || name === "unNumber" || name === "temperature") {
+      if (
+        (formData.cargoCategory === "hazardous" ||
+          formData.cargoCategory === "both") &&
+        (name === "imoNumber" || name === "unNumber")
+      ) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: value ? "" : "This field is required",
+        }));
+      }
+
+      if (
+        (formData.cargoCategory === "refer" ||
+          formData.cargoCategory === "both") &&
+        name === "temperature"
+      ) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: value ? "" : "This field is required",
+        }));
+      }
+    }
+
     if (name == "allotmentDate" && value > currentDate) {
       setErrors((prev) => ({
         ...prev,
@@ -222,6 +264,32 @@ const AllotmentStuffing = () => {
       pdaAccount: formData.pdaAccount ? "" : "This field is required",
     };
 
+    // Add validation for cargo category dependent fields
+    if (
+      formData.cargoCategory === "hazardous" ||
+      formData.cargoCategory === "both"
+    ) {
+      if (!formData.imoNumber) newErrors.imoNumber = "IMO Number is required";
+      if (!formData.unNumber) newErrors.unNumber = "UN Number is required";
+    }
+
+    if (
+      formData.cargoCategory === "refer" ||
+      formData.cargoCategory === "both"
+    ) {
+      if (!formData.temperature)
+        newErrors.temperature = "Temperature is required";
+    }
+
+    setErrors(newErrors);
+
+    // Check if there are any errors
+    const hasErrors = Object.values(newErrors).some((error) => error !== "");
+    if (hasErrors) {
+      toast.error("Please fill all required fields");
+      return;
+    }
+
     const tare = Number(formData.tareWeight);
     const mg = Number(formData.mgWeight);
     const maxAllowed = mg - tare;
@@ -234,11 +302,11 @@ const AllotmentStuffing = () => {
     const payload = {
       containerNumber: fetchedContainer?.container_number || null,
       allotment_date: formattedAllotmentDate,
-      allotment_type: formData.allotmentType,
-      pda_account: formData.pdaAccount || null,
+      allotment_type: formData.allotmentType.toUpperCase(),
+      pda_account: formData.pdaAccount.toUpperCase() || null,
       agreement_party: formData.aggrementParty || null,
       shipper: formData.shipper || null,
-      cargo_category: formData.cargoCategory,
+      cargo_category: formData.cargoCategory.toUpperCase(),
       un_number: formData.unNumber || null,
       imo_number: formData.imoNumber || null,
       temperature: formData.temperature || null,
@@ -382,7 +450,20 @@ const AllotmentStuffing = () => {
   }, [gateInLoadStatus]);
 
   const handleDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 

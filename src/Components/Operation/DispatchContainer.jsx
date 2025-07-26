@@ -37,6 +37,8 @@ const DispatchContainer = () => {
   const transporters = useSelector((state) => state.transporters);
   const currentDate = moment().format("DD-MM-YYYY");
   const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
+  const [dataByCartingNumber, setDataByCartingNumber] = useState({});
+  let operationFromStorage = parseInt(localStorage.getItem("operation"), 10);
 
   const [formData, setFormData] = useState({
     containerNumber,
@@ -56,7 +58,6 @@ const DispatchContainer = () => {
     wagonNo: "",
     pol: "",
     shipLine: "",
-    shippingLineSeal: "",
     containerCondition: "",
     anyOtherCondition: "",
     bookingNumber: "",
@@ -81,8 +82,90 @@ const DispatchContainer = () => {
     hsCode: "",
   });
 
+  // useEffect(() => {
+  //   const mergedData = {
+  //     containerNumber: fetchedContainer?.container_number || "",
+  //     shippingLineId: fetchedContainer?.shipping_line_id || "",
+  //     size: fetchedContainer?.size || "",
+  //     type: fetchedContainer?.container_type || "",
+  //     tareWeight: fetchedContainer?.tare_weight || "",
+  //     mgWeight: fetchedContainer?.mg_weight || "",
+  //     mfdDate: fetchedContainer?.mfd_date || "",
+  //     cscValidity: fetchedContainer?.csc_validity || "",
+  //     remarks: fetchedContainer?.remarks || "",
+
+  //     forwarder1:
+  //       previousPageData?.forwarder1 || previousPageData?.forwarder1Id || "",
+  //     forwarder2:
+  //       previousPageData?.forwarder2 || previousPageData?.forwarder2Id || "",
+  //     bookingNumber:
+  //       previousPageData?.bookingNumber ||
+  //       previousPageData?.booking_no ||
+  //       previousPageData?.bookingNo ||
+  //       "",
+  //     yard:
+  //       previousPageData?.yardId ||
+  //       previousPageData?.yard ||
+  //       previousPageData?.yard_id ||
+  //       previousPageData?.yardName ||
+  //       "",
+  //     transportMode: previousPageData?.transport_mode || "",
+  //     loadStatus:
+  //       previousPageData?.load_status ||
+  //       previousPageData?.loadStatus ||
+  //       "loaded",
+  //     vesselName:
+  //       previousPageData?.vesselViaNumber || previousPageData?.vesselByNo || "",
+  //     shipperName:
+  //       (previousPageData?.cargoDetails &&
+  //         previousPageData?.cargoDetails[0]?.shipperName) ||
+  //       "",
+  //     consigneeName:
+  //       (previousPageData?.cargoDetails &&
+  //         previousPageData?.cargoDetails[0]?.consigneeName) ||
+  //       "",
+  //     cargo:
+  //       (previousPageData?.cargoDetails &&
+  //         previousPageData?.cargoDetails[0]?.cargo) ||
+  //       "",
+  //     hsCode: previousPageData?.hsCode || "",
+  //     portOfDischarge:
+  //       previousPageData?.dischargePortName ||
+  //       previousPageData[0]?.pod ||
+  //       previousPageData?.pod ||
+  //       "",
+  //     pol: previousPageData?.pol || previousPageData[0]?.pol || "",
+  //     shipLine:
+  //       previousPageData?.shipline ||
+  //       previousPageData[0]?.shipping_line_seal ||
+  //       "",
+  //     custom:
+  //       previousPageData?.custom || previousPageData[0]?.custom_seal || "",
+  //     other: previousPageData?.other || "",
+  //     otherSealDescription:
+  //       previousPageData?.other_description ||
+  //       previousPageData?.otherSealRemark ||
+  //       "",
+  //     anyOtherRemarks: previousPageData?.anyOtherRemark || "",
+  //     containerRemarks:
+  //       previousPageData?.remarks || previousPageData?.remark || "",
+  //     fpd: previousPageData?.fpd || previousPageData[0]?.fpd || "",
+  //     refNo: previousPageData?.ref_no || "",
+  //     containerStatus: previousPageData?.containerStatus || "",
+  //   };
+
+  //   setFormData((prev) => ({
+  //     ...prev,
+  //     ...mergedData,
+  //   }));
+  // }, [fetchedContainer, previousPageData]);
+
+  // console.log("Fetched Container::", fetchedContainer);
+
   useEffect(() => {
-    const mergedData = {
+    if (!fetchedContainer) return;
+
+    const containerData = {
       containerNumber: fetchedContainer?.container_number || "",
       shippingLineId: fetchedContainer?.shipping_line_id || "",
       size: fetchedContainer?.size || "",
@@ -92,68 +175,13 @@ const DispatchContainer = () => {
       mfdDate: fetchedContainer?.mfd_date || "",
       cscValidity: fetchedContainer?.csc_validity || "",
       remarks: fetchedContainer?.remarks || "",
-
-      forwarder1:
-        previousPageData?.forwarder1 || previousPageData?.forwarder1Id || "",
-      forwarder2:
-        previousPageData?.forwarder2 || previousPageData?.forwarder2Id || "",
-      bookingNumber:
-        previousPageData?.bookingNumber ||
-        previousPageData?.booking_no ||
-        previousPageData?.bookingNo ||
-        "",
-      yard:
-        previousPageData?.yardId ||
-        previousPageData?.yard ||
-        previousPageData?.yard_id ||
-        previousPageData?.yardName ||
-        "",
-      transportMode: previousPageData?.transport_mode || "",
-      loadStatus:
-        previousPageData?.load_status ||
-        previousPageData?.loadStatus ||
-        "loaded",
-      vesselName:
-        previousPageData?.vesselViaNumber || previousPageData?.vesselByNo || "",
-      shipperName:
-        (previousPageData?.cargoDetails &&
-          previousPageData?.cargoDetails[0]?.shipperName) ||
-        "",
-      consigneeName:
-        (previousPageData?.cargoDetails &&
-          previousPageData?.cargoDetails[0]?.consigneeName) ||
-        "",
-      cargo:
-        (previousPageData?.cargoDetails &&
-          previousPageData?.cargoDetails[0]?.cargo) ||
-        "",
-      hsCode: previousPageData?.hsCode || "",
-      portOfDischarge: previousPageData?.dischargePortName || "",
-      pol: previousPageData?.pol || "",
-      shippingLineSeal: previousPageData?.shippingLineSeal || "",
-      shipLine: previousPageData?.shipline || "",
-      custom: previousPageData?.custom || "",
-      other: previousPageData?.other || "",
-      otherSealDescription:
-        previousPageData?.other_description ||
-        previousPageData?.otherSealRemark ||
-        "",
-      anyOtherRemarks: previousPageData?.anyOtherRemark || "",
-      containerRemarks:
-        previousPageData?.remarks || previousPageData?.remark || "",
-      fpd: previousPageData?.fpd || "",
-      refNo: previousPageData?.ref_no || "",
-      containerStatus: previousPageData?.containerStatus || "",
     };
 
     setFormData((prev) => ({
       ...prev,
-      ...mergedData,
+      ...containerData,
     }));
-  }, [fetchedContainer, previousPageData]);
-
-  // console.log("Fetched Container::", fetchedContainer);
-  console.log("PreviousPageData ::", previousPageData);
+  }, [fetchedContainer]);
 
   const handleChange = (e) => {
     let { name, value } = e.target;
@@ -226,40 +254,109 @@ const DispatchContainer = () => {
     dispatch(fetchTransporters());
   }, [dispatch, containerNumber]);
 
+  // const getPreviousPageData = async () => {
+  //   const operationFromStorage = parseInt(
+  //     localStorage.getItem("operation"),
+  //     10
+  //   );
+
+  //   let load_status = null;
+
+  //   if ([8, 24, 6].includes(operationFromStorage)) {
+  //     load_status = "loaded";
+  //   } else if (operationFromStorage === 20) {
+  //     load_status = "empty";
+  //   }
+
+  //   let res;
+
+  //   if (load_status === "loaded") {
+  //     const fetchMap = {
+  //       8: operationService.getFactoryStuffingDetails,
+  //       6: operationService.getICDStuffingDetails,
+  //       24: operationService.getStuffingProceedDetail,
+  //     };
+
+  //     const fetchFunc = fetchMap[operationFromStorage];
+
+  //     if (fetchFunc) {
+  //       res = await fetchFunc(containerNumber);
+  //       setPreviousPageData(res.data);
+  //       console.log("response1212::", res);
+  //       return;
+  //     }
+  //   } else if (load_status === "empty") {
+  //     res = await operationService.getAllotmentER(containerNumber);
+  //     setPreviousPageData(res.data);
+  //   }
+  // };
+
+  const fetchCartingDetails = async () => {
+    try {
+      const queryParams = {
+        containerNumber: formData.containerNumber,
+      };
+
+      const res = await operationService.getCartingDetails(queryParams);
+      if (res.success) {
+        console.log("Result::", res.data[0]);
+        setDataByCartingNumber(res.data[0]);
+      } else {
+        toast.error(res.message || "Failed to fetch carting details");
+      }
+    } catch (err) {
+      console.error("Fetch Error:", err);
+      toast.error("Something went wrong while fetching details.");
+    }
+  };
+
+  useEffect(() => {
+    if (operationFromStorage == 24) {
+      fetchCartingDetails();
+    }
+  }, [fetchedContainer.container_number]);
+
   const getPreviousPageData = async () => {
-    const operationFromStorage = parseInt(
-      localStorage.getItem("operation"),
-      10
-    );
+    console.log("Last OP::", operationFromStorage);
 
     let load_status = null;
 
-    if ([8, 9, 6].includes(operationFromStorage)) {
+    if ([8, 24, 6].includes(operationFromStorage)) {
       load_status = "loaded";
-    } else if (operationFromStorage === 20) {
+    } else if (operationFromStorage == 20) {
       load_status = "empty";
     }
 
     let res;
 
-    if (load_status === "loaded") {
+    if (load_status == "loaded") {
       const fetchMap = {
         8: operationService.getFactoryStuffingDetails,
         6: operationService.getICDStuffingDetails,
-        9: operationService.getStuffingLclDetails,
+        24: operationService.getStuffingLCLProceedDetail,
       };
 
       const fetchFunc = fetchMap[operationFromStorage];
 
       if (fetchFunc) {
-        res = await fetchFunc(containerNumber);
-        setPreviousPageData(res.data);
-        console.log("response1212::", res);
-        return;
+        if (operationFromStorage == 24) {
+          res = await fetchFunc(fetchedContainer.id);
+        } else {
+          res = await fetchFunc(containerNumber);
+        }
       }
-    } else if (load_status === "empty") {
+    } else if (load_status == "empty") {
       res = await operationService.getAllotmentER(containerNumber);
-      setPreviousPageData(res.data);
+    }
+
+    if (res?.data) {
+      if (Array.isArray(res.data)) {
+        setPreviousPageData(res.data[0] || {});
+      } else {
+        setPreviousPageData(res.data);
+      }
+    } else {
+      setPreviousPageData({});
     }
   };
 
@@ -267,32 +364,73 @@ const DispatchContainer = () => {
     getPreviousPageData();
   }, [containerNumber]);
 
-  // const handleDateChange = (e) => {
-  //   const { name, value } = e.target;
+  useEffect(() => {
+    if (!previousPageData || Object.keys(previousPageData).length === 0) return;
 
-  //   // Update form data
-  //   setFormData((prev) => ({ ...prev, [name]: value }));
+    const previousData = {
+      forwarder1:
+        previousPageData?.forwarder1 || previousPageData?.forwarder1Id || "",
+      forwarder2:
+        previousPageData?.forwarder2 || previousPageData?.forwarder2Id || "",
+      bookingNumber:
+        previousPageData?.bookingNumber ||
+        previousPageData?.booking_no ||
+        previousPageData?.bookingNo ||
+        "",
+      yard:
+        previousPageData?.yardId ||
+        previousPageData?.yard ||
+        previousPageData?.yard_id ||
+        previousPageData?.yardName ||
+        "",
+      transportMode: previousPageData?.transport_mode || "",
+      loadStatus:
+        previousPageData?.load_status ||
+        previousPageData?.loadStatus ||
+        "loaded",
+      vesselName:
+        previousPageData?.vesselViaNumber || previousPageData?.vesselByNo || "",
+      shipperName:
+        previousPageData?.cargoDetails?.[0]?.shipperName ||
+        dataByCartingNumber?.shipper ||
+        "",
+      consigneeName:
+        previousPageData?.cargoDetails?.[0]?.consigneeName ||
+        dataByCartingNumber?.consignee ||
+        "",
+      cargo:
+        previousPageData?.cargoDetails?.[0]?.cargo ||
+        dataByCartingNumber?.cargo ||
+        "",
+      hsCode: previousPageData?.hsCode || "",
+      portOfDischarge:
+        previousPageData?.dischargePortName || previousPageData?.pod || "",
+      pol: previousPageData?.pol || "",
+      shipLine:
+        previousPageData?.shipline ||
+        previousPageData?.shipping_line_seal ||
+        "",
+      custom: previousPageData?.custom || previousPageData?.custom_seal || "",
+      other: previousPageData?.other || "",
+      otherSealDescription:
+        previousPageData?.other_description ||
+        previousPageData?.otherSealRemark ||
+        "",
+      anyOtherRemarks: previousPageData?.anyOtherRemark || "",
+      containerRemarks:
+        previousPageData?.remarks || previousPageData?.remark || "",
+      fpd: previousPageData?.fpd || "",
+      refNo: previousPageData?.ref_no || "",
+      containerStatus: previousPageData?.containerStatus || "",
+    };
 
-  //   const isValidFormat = /^\d{2}-\d{2}-\d{4}$/.test(value);
-  //   const inputDate = moment(value, "DD-MM-YYYY", true);
+    setFormData((prev) => ({
+      ...prev,
+      ...previousData,
+    }));
+  }, [previousPageData]);
 
-  //   if (!value) {
-  //     setErrors((prev) => ({
-  //       ...prev,
-  //       [name]: "Allotment Date is required",
-  //     }));
-  //   } else if (!isValidFormat || !inputDate.isValid()) {
-  //     setErrors((prev) => ({
-  //       ...prev,
-  //       [name]: "Date must be in DD-MM-YYYY format",
-  //     }));
-  //   } else {
-  //     setErrors((prev) => ({
-  //       ...prev,
-  //       [name]: undefined,
-  //     }));
-  //   }
-  // };
+  console.log("PreviousPageData ::", previousPageData);
 
   const handleDateChange = (e) => {
     const { name, value } = e.target;

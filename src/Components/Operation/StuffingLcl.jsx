@@ -15,7 +15,7 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { get } from "react-hook-form";
 import StuffingProcessFetchDetails from "./StuffingProcessFetchDetails";
-import _ from "lodash";
+import _, { update } from "lodash";
 
 const StuffingLCL = () => {
   const { layoutURL } = useContext(CustomizerContext);
@@ -30,6 +30,8 @@ const StuffingLCL = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [editFormData, setEditFormData] = useState({});
   const [stuffingDetail, setStuffingDetail] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [operationId, setOperationId] = useState(null);
 
   const [cartingData, setCartingData] = useState({});
   const [errors, setErrors] = useState({});
@@ -97,6 +99,7 @@ const StuffingLCL = () => {
     }
 
     setFormData(updatedData);
+    console.log("Container ID::", fetchedContainer.id);
   }, [fetchedContainer]);
 
   const handleDownload = () => {
@@ -119,170 +122,143 @@ const StuffingLCL = () => {
     saveAs(data, `${fileName}.xlsx`);
   };
 
-  // const handleSave = async () => {
-  //   const existingStuffing = await operationService.getStuffingLclDetails(
-  //     fetchedContainer?.container_number
-  //   );
-
-  //   const payload = {
-  //     container_id: fetchedContainer.id,
-  //     stuffing_request_date: formData.stuffingRequestDate
-  //       ? moment(formData.stuffingRequestDate, "DD-MM-YYYY").format(
-  //           "YYYY-MM-DD"
-  //         )
-  //       : null,
-  //     pod: formData.pod || null,
-  //     fpd: formData.fpd || null,
-  //     pol: formData.pol || null,
-  //     shipping_line_seal: formData.shipLineSeal || null,
-  //     custom_seal: formData.customSeal || null,
-  //     carting_ids: "ID1,ID2,ID3",
-  //     ship_bill_no: formData.shipBillNumber || null,
-  //     select_master_line: 3,
-  //   };
-
-  //   if (existingStuffing) {
-  //     // Prepare comparable object from existing data
-  //     const existingData = {
-  //       stuffing_request_date: existingStuffing.stuffing_request_date || null,
-  //       pod: existingStuffing.pod || null,
-  //       fpd: existingStuffing.fpd || null,
-  //       pol: existingStuffing.pol || null,
-  //       shipping_line_seal: existingStuffing.shipping_line_seal || null,
-  //       custom_seal: existingStuffing.custom_seal || null,
-  //       ship_bill_no: existingStuffing.ship_bill_no || null,
-  //     };
-
-  //     // Check if anything changed
-  //     const isChanged = Object.keys(existingData).some(
-  //       (key) => existingData[key] !== payload[key]
-  //     );
-
-  //     if (!isChanged) {
-  //       toast.info("No changes detected.");
-  //       return;
-  //     }
-
-  //     const updateRes = await operationService.updateStuffingLcl(payload);
-  //     if (updateRes?.success) {
-  //       toast.success("Fields are Updated Successfully");
-  //     } else {
-  //       toast.error("Failed to update stuffing details.");
-  //     }
-  //   } else {
-  //     const createRes = await operationService.stuffingLCL(payload);
-  //     if (createRes?.success) {
-  //       toast.success(
-  //         `YOU HAVE SUCCESSFULLY SAVED STUFFING-LCL OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${createRes.data.id}`
-  //       );
-  //       localStorage.setItem("operation", 9);
-  //     } else {
-  //       toast.error("Failed to save stuffing details.");
-  //     }
-  //   }
-  // };
-
-  const handleSave = async () => {
-    const payload = {
-      container_id: fetchedContainer?.id,
-      stuffing_request_date: formData.stuffingRequestDate
-        ? moment(formData.stuffingRequestDate, "DD-MM-YYYY").format(
-            "YYYY-MM-DD"
-          )
-        : null,
-      pod: formData.pod || null,
-      fpd: formData.fpd || null,
-      pol: formData.pol || null,
-      shipping_line_seal: formData.shipLineSeal || null,
-      custom_seal: formData.customSeal || null,
-      carting_ids: "ID1,ID2,ID3",
-      ship_bill_no: formData.shipBillNumber || null,
-      select_master_line: 3,
-    };
-
+  const getOperationId = async () => {
     try {
-      const existing = await operationService.getStuffingLclDetails(
+      const res = await operationService.getByContainerNumber(
         fetchedContainer?.container_number
       );
+      setOperationId(res.data[0].id);
+      console.log("Result::", res.data[0].id);
+    } catch (error) {
+      console.log("Error::", error);
+    }
+  };
+
+  useEffect(() => {
+    getOperationId();
+  }, []);
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const payload = {
+        container_id: fetchedContainer.id,
+        stuffing_request_date: formData.stuffingRequestDate
+          ? moment(formData.stuffingRequestDate, "DD-MM-YYYY").format(
+              "YYYY-MM-DD"
+            )
+          : null,
+        pod: formData.pod || null,
+        fpd: formData.fpd || null,
+        pol: formData.pol || null,
+        shipping_line_seal: formData.shipLineSeal || null,
+        custom_seal: formData.customSeal || null,
+        carting_ids: "ID1,ID2,ID3", // static
+        ship_bill_no: formData.shipBillNumber || null,
+        select_master_line: 3,
+      };
+
+      let existing = null;
+      try {
+        const res = await operationService.getStuffingLclDetails(
+          fetchedContainer?.container_number
+        );
+        existing = Array.isArray(res?.data) ? res.data[0] : res.data;
+
+        console.log("Fetched existing stuffing LCL:", existing);
+      } catch (err) {
+        console.warn("No existing stuffing LCL found:", err);
+      }
 
       if (existing) {
-        const existingPayload = {
-          container_id: existing?.container_id,
-          stuffing_request_date: existing?.stuffing_request_date
-            ? moment(existing.stuffing_request_date).format("YYYY-MM-DD")
-            : null,
-          pod: existing?.pod || null,
-          fpd: existing?.fpd || null,
-          pol: existing?.pol || null,
-          shipping_line_seal: existing?.shipping_line_seal || null,
-          custom_seal: existing?.custom_seal || null,
-          carting_ids: existing?.carting_ids || "ID1,ID2,ID3",
-          ship_bill_no: existing?.ship_bill_no || null,
-          select_master_line: 3,
-        };
-
-        if (_.isEqual(payload, existingPayload)) {
-          toast.info("No changes detected to update.");
-          return;
+        // Normalize dates
+        if (existing.stuffing_request_date) {
+          existing.stuffing_request_date = moment(
+            existing.stuffing_request_date
+          ).format("YYYY-MM-DD");
         }
 
-        const updated = await operationService.updateStuffingLcl(payload);
+        const normalize = (value) => {
+          if (value === undefined || value === null) return "";
+          return typeof value === "string" ? value.trim() : String(value);
+        };
+
+        const isChanged = Object.entries(payload).some(([key, value]) => {
+          const newVal = normalize(value);
+          const existingVal = normalize(existing[key]); // same key names!
+          return newVal !== existingVal;
+        });
+
+        if (!isChanged) {
+          toast.info("No changes detected to update.");
+          return setLoading(false);
+        }
+
+        const updated = await operationService.updateStuffingLcl(
+          operationId,
+          payload
+        );
+        console.log("Response::", updated);
         if (updated?.success) {
           toast.success("Fields are Updated Successfully");
         }
       } else {
-        const res = await operationService.stuffingLCL(payload);
-        if (res?.success) {
+        const create = await operationService.stuffingLCL(payload);
+        if (create?.success) {
           toast.success(
-            `YOU HAVE SUCCESSFULLY SAVED STUFFING-LCL OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${res.data.id}`
+            `YOU HAVE SUCCESSFULLY SAVED STUFFING-LCL DETAIL FOR ${fetchedContainer?.container_number}. WHERE ENTRY ID IS ${create.data.id}`
           );
           localStorage.setItem("operation", 9);
-          // navigate(`${process.env.PUBLIC_URL}/app/operation/Admin`);
+        } else {
+          console.error("Create failed:", create);
+          toast.error("Failed to save new stuffing details.");
         }
       }
     } catch (error) {
       console.error("Error in handleSave:", error);
       toast.error("An error occurred while saving.");
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     dispatch(fetchForwarders());
     dispatch(fetchContainerByNumber(containerNumber));
-  }, [dispatch]);
+  }, [dispatch, containerNumber]);
 
   const handleProceed = async () => {
     setStuffingDetail(true);
   };
 
   // Option 1: Move the function inside useEffect (simplest solution)
-  useEffect(() => {
-    const getPreviousPageData = async () => {
-      let lastOp = localStorage.getItem("operation");
 
-      if (!containerNumber) return;
+  const getPreviousPageData = async () => {
+    let lastOp = localStorage.getItem("operation");
 
-      try {
-        let res;
-        if (lastOp == "19") {
-          res = await operationService.allotmentStuffingDetailsByContainerNo(
-            containerNumber
-          );
-          if (res.success) setPreviousPageData(res.data);
-        } else if (lastOp == "9") {
-          res = await operationService.getStuffingLclDetails(containerNumber);
-          if (res.success && res.data.length > 0)
-            setPreviousPageData(res.data[0]);
-        }
-      } catch (error) {
-        console.error("getPreviousPageData error::", error);
+    try {
+      let res;
+      if (lastOp == "19") {
+        res = await operationService.allotmentStuffingDetailsByContainerNo(
+          fetchedContainer.container_number
+        );
+        if (res.success) setPreviousPageData(res.data);
+      } else if (lastOp == "9") {
+        res = await operationService.getStuffingLclDetails(
+          fetchedContainer.container_number
+        );
+        console.log("Response::", res);
+        if (res.success && res.data.length > 0)
+          setPreviousPageData(res.data[0]);
       }
-    };
-
-    if (containerNumber) {
-      getPreviousPageData();
+    } catch (error) {
+      console.error("getPreviousPageData error::", error);
     }
-  }, [containerNumber]);
+  };
+
+  useEffect(() => {
+    getPreviousPageData();
+  }, [fetchedContainer.container_number]);
 
   useEffect(() => {
     setFormData((prev) => ({
@@ -291,7 +267,7 @@ const StuffingLCL = () => {
         moment(previousPageData.stuffing_request_date).format("DD-MM-YYYY") ||
         null,
       pol: previousPageData.pol || null,
-      pod: previousPageData.pod || null,
+      pod: previousPageData.pod || previousPageData.discharge_port_name || null,
       fpd: previousPageData.fpd || null,
       shipLineSeal:
         previousPageData.shipping_line_seal ||
@@ -307,12 +283,6 @@ const StuffingLCL = () => {
       fetchCartingDetails();
     }
   }, [fetchedContainer?.container_number]);
-
-  useEffect(() => {
-    if (formData.containerNumber) {
-      fetchCartingDetails();
-    }
-  }, [formData.containerNumber]);
 
   // 🔁 Reusable GET call
   const fetchCartingDetails = async () => {
@@ -519,8 +489,6 @@ const StuffingLCL = () => {
     }
   };
 
-  console.log("form::", formData, fetchedContainer);
-
   return (
     <Fragment>
       {!stuffingDetail ? (
@@ -665,9 +633,6 @@ const StuffingLCL = () => {
                     <Col md="6">
                       <h6 className="mt-5">Carting Details</h6>
                     </Col>
-                    {/* <p className="text-danger">
-                  No Carting has done for this container
-                </p> */}
                   </Row>
                   <div className="table-responsive rounded shadow-sm border my-3">
                     <Table
@@ -791,13 +756,11 @@ const StuffingLCL = () => {
                               </td>
                               <td></td>
                               <td>
-                                {dataByCartingNumber
-                                  .reduce(
-                                    (sum, item) =>
-                                      sum + (parseFloat(item.packages) || 0),
-                                    0
-                                  )
-                                  .toFixed(2)}
+                                {dataByCartingNumber.reduce(
+                                  (sum, item) =>
+                                    sum + (parseFloat(item.packages) || 0),
+                                  0
+                                )}
                               </td>
                               <td>
                                 {dataByCartingNumber
@@ -829,28 +792,10 @@ const StuffingLCL = () => {
                         className="btn btn-primary w-100"
                         onClick={handleSave}
                       >
-                        Save
+                        {loading ? "Saving..." : "Save"}
                       </button>
                     </Row>
                   </div>
-                  {/* <Row className="mb-3">
-                    <Col md="6">
-                      <button
-                        onClick={handleDownload}
-                        className="btn btn-primary"
-                      >
-                        Download Stuffing Request Details
-                      </button>
-                    </Col>
-                    <Col md="6">
-                      <button
-                        className="btn btn-primary"
-                        onClick={handleProceed}
-                      >
-                        Proceed to enter Stuffing Details
-                      </button>
-                    </Col>
-                  </Row> */}
                   <Row className="mb-3">
                     <Col xs="12" md="6" className="mb-2 mb-md-0">
                       <button

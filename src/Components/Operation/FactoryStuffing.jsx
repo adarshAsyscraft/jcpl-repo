@@ -260,44 +260,51 @@ const FactoryStuffing = () => {
   const getPreviousData = async () => {
     const containerNumber = fetchedContainer?.container_number;
     if (!containerNumber) return;
+    let allotmentRes;
+    let gateInRes;
 
     try {
+      let lastOp = localStorage.getItem("operation");
       // 1. First fetch allotment data (for cargo details)
-      const allotmentRes =
-        await operationService.allotmentStuffingDetailsByContainerNo(
-          containerNumber
-        );
-      if (!allotmentRes.success) {
-        toast.error("Failed to fetch allotment stuffing data");
-        return;
+      if (lastOp == "19") {
+        allotmentRes =
+          await operationService.allotmentStuffingDetailsByContainerNo(
+            containerNumber
+          );
+        if (!allotmentRes.success) {
+          toast.error("Failed to fetch allotment stuffing data");
+          return;
+        }
+        setAllotmentData(allotmentRes);
+        console.log("AllotmentRes::", allotmentRes);
       }
-      setAllotmentData(allotmentRes.data);
 
       // 2. Then fetch gate-in data (for seal details and other fields)
-      const gateInRes = await operationService.getInDataFechByContainerNumber(
-        containerNumber
-      );
-      if (!gateInRes.success) {
-        toast.error("Failed to fetch gate-in data");
-        return;
+      else if (lastOp == "10") {
+        gateInRes = await operationService.getInDataFechByContainerNumber(
+          containerNumber
+        );
+        if (!gateInRes.success) {
+          toast.error("Failed to fetch gate-in data");
+          return;
+        }
+        setPreviousPageData(gateInRes.data);
       }
-      setPreviousPageData(gateInRes.data);
-
       // 3. Set cargo details from allotment data
       const cargoDetail = {
-        shipBillNumber: allotmentRes.data.shipp_bill_no || "",
+        shipBillNumber: allotmentData.data.shipp_bill_no || "",
         shipBillDate:
-          moment(allotmentRes.data.s_bill_date).format("DD-MM-YYYY") || "",
-        shipperName: allotmentRes.data.shipper || "",
-        consigneeName: allotmentRes.data.consignee_name || "",
-        cargo: allotmentRes.data.cargo || "",
-        "cargoWeight (in kg)": allotmentRes.data.cargo_wt_kgs || "0.000",
-        cbm: allotmentRes.data.cbm || "0.000",
-        packedIn: allotmentRes.data.packed_in || "",
-        packages: allotmentRes.data.packages || "0",
-        marks: allotmentRes.data.marks || "",
-        number: allotmentRes.data.number || "",
-        remarks: allotmentRes.data.remark || "",
+          moment(allotmentData.data.s_bill_date).format("DD-MM-YYYY") || "",
+        shipperName: allotmentData.data.shipper || "",
+        consigneeName: allotmentData.data.consignee_name || "",
+        cargo: allotmentData.data.cargo || "",
+        "cargoWeight (in kg)": allotmentData.data.cargo_wt_kgs || "0.000",
+        cbm: allotmentData.data.cbm || "0.000",
+        packedIn: allotmentData.data.packed_in || "",
+        packages: allotmentData.data.packages || "0",
+        marks: allotmentData.data.marks || "",
+        number: allotmentData.data.number || "",
+        remarks: allotmentData.data.remark || "",
         id: Date.now(),
         slNo: 1,
       };
@@ -308,31 +315,35 @@ const FactoryStuffing = () => {
         ...prev,
         // From allotment data
 
-        cargoCategory: allotmentRes.data.cargo_category,
-        imoNumber: allotmentRes.data.imo_number,
-        unNumber: allotmentRes.data.un_number,
-        temperature: allotmentRes.data.temperature,
-        bookingNumber: allotmentRes.data.booking_no,
-        pol: allotmentRes.data.pol,
-        dischargePortName: allotmentRes.data.discharge_port_name,
-        fpd: allotmentRes.data.fpd,
-        pdaAccount: allotmentRes.data.pda_account,
-        aggrementParty: allotmentRes.data.agreement_party,
-        vesselViaNumber: allotmentRes.data.vessel_via_no,
-        placeOfHandOver: allotmentRes.data.place_of_handover,
+        cargoCategory: allotmentData.data.cargo_category,
+        imoNumber: allotmentData.data.imo_number,
+        unNumber: allotmentData.data.un_number,
+        temperature: allotmentData.data.temperature,
+        bookingNumber: allotmentData.data.booking_no,
+        pol: allotmentData.data.pol,
+        dischargePortName: allotmentData.data.discharge_port_name,
+        fpd: allotmentData.data.fpd,
+        pdaAccount: allotmentData.data.pda_account,
+        aggrementParty: allotmentData.data.agreement_party,
+        vesselViaNumber: allotmentData.data.vessel_via_no,
+        placeOfHandOver: allotmentData.data.place_of_handover,
 
-        excise: gateInRes.data.excise,
-        other: gateInRes.data.other,
+        excise: previousPageData.data.excise,
+        other: previousPageData.data.other,
         otherSealRemarks:
-          gateInRes.data.other_seal_desc || gateInRes.data.otherSealDescription,
+          previousPageData.data.other_seal_desc ||
+          previousPageData.data.otherSealDescription,
 
         // From gate-in data (seal details)
-        forwarder1: gateInRes.data.forwarder1Id,
-        forwarder2: gateInRes.data.forwarder2Id,
-        stuffingDate: moment(gateInRes.data?.inDate).format("DD-MM-YYYY"),
-        shipline: gateInRes.data.ship_line || gateInRes.data.shipLine,
-        yardName: gateInRes.data.yard_id || gateInRes.data.yard,
-        custom: gateInRes.data.custom,
+        forwarder1: previousPageData.data.forwarder1Id,
+        forwarder2: previousPageData.data.forwarder2Id,
+        stuffingDate: moment(previousPageData.data?.inDate).format(
+          "DD-MM-YYYY"
+        ),
+        shipline:
+          previousPageData.data.ship_line || previousPageData.data.shipLine,
+        yardName: previousPageData.data.yard_id || previousPageData.data.yard,
+        custom: previousPageData.data.custom,
       }));
     } catch (error) {
       console.error("Error fetching previous data:", error);

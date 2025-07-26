@@ -173,7 +173,7 @@ const CartingLCLContainer = () => {
       0
     );
     setCbm(totalCBM.toFixed(3));
-    setPackages(totalPackage.toFixed(3));
+    setPackages(totalPackage);
 
     setFormData((prev) => ({ ...prev, cbm: totalCBM.toFixed(3) }));
   };

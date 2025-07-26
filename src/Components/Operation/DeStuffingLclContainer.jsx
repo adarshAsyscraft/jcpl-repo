@@ -26,11 +26,11 @@ import { fetchContainerByNumber } from "../../Redux/slices/containerSlice";
 const FIELDS_CONFIG = [
   { name: "consigneeName", label: "Consignee Name" },
   { name: "blAwnNumber", label: "BL/AWN Number" },
-  { name: "blAwnDate", label: "BL/AWN Date" },
+  { name: "blAwnDate", label: "BL/AWN Date", type: "text" },
   { name: "igmNo", label: "IGM No" },
-  { name: "igmDate", label: "IGM Date" },
+  { name: "igmDate", label: "IGM Date", type: "text" },
   { name: "tpNo", label: "TP No" },
-  { name: "tpDate", label: "TP Date" },
+  { name: "tpDate", label: "TP Date", type: "text" },
   { name: "cargo", label: "Cargo" },
   { name: "cargoWeight", label: "Cargo Weight (in kg)" },
   { name: "cbm", label: "CBM" },
@@ -279,7 +279,7 @@ const DestuffLclContainer = () => {
             slNo: item.slNo,
             blAwnNumber: item.blAwnNumber || "",
             blAwnDate: item.blAwnDate
-              ? moment(item.blAwnDate).format("YYYY-MM-DD")
+              ? moment(item.blAwnDate, "DD-MM-YYYY").format("YYYY-MM-DD")
               : "",
             cargo: item.cargo || "",
             cargoWeight: item.cargoWeight || "0.000",
@@ -292,10 +292,12 @@ const DestuffLclContainer = () => {
             number: item.number || "",
             remarks: item.remarks || "",
             tpNo: item.tpNumber || "",
-            tpDate: item.tpDate ? moment(item.tpDate).format("YYYY-MM-DD") : "",
+            tpDate: item.tpDate
+              ? moment(item.tpDate, "DD-MM-YYYY").format("YYYY-MM-DD")
+              : "",
             igmNo: item.igmNumber || "",
             igmDate: item.igmDate
-              ? moment(item.igmDate).format("YYYY-MM-DD")
+              ? moment(item.igmDate, "DD-MM-YYYY").format("YYYY-MM-DD")
               : "",
             consigneeName: item.consignee_name || "",
           })
@@ -331,7 +333,7 @@ const DestuffLclContainer = () => {
   // Helper functions
   const getInputType = (field) => {
     const lowerField = field.toLowerCase();
-    if (lowerField.includes("date")) return "date";
+    if (lowerField.includes("date")) return "text";
     if (
       lowerField.includes("number") ||
       lowerField.includes("weight") ||
@@ -375,40 +377,6 @@ const DestuffLclContainer = () => {
       },
     ]);
   };
-
-  // const handleChange2 = (field, value) => {
-  //   const updatedFormData = { ...formData2, [field]: value };
-  //   setFormData2(updatedFormData);
-
-  //   const errors = { ...formErrors };
-
-  //   // if (field === 'destuffDate') {
-  //   //   if (!value) {
-  //   //     errors.destuffDate = "Destuff Date is required";
-  //   //   } else if (moment(value).isAfter(currentDate)) {
-  //   //     errors.destuffDate = "Destuff Date cannot be greater than current date";
-  //   //   } else if (moment(value).isBefore(minAllowedDate)) {
-  //   //     errors.destuffDate = "Destuff Date cannot be more than 3 days before current date";
-  //   //   } else {
-  //   //     delete errors.destuffDate;
-  //   //   }
-  //   // }
-
-  //   if (field === "forwarder1" || field === "forwarder2") {
-  //     const forwarder1 =
-  //       field === "forwarder1" ? value : updatedFormData.forwarder1;
-  //     const forwarder2 =
-  //       field === "forwarder2" ? value : updatedFormData.forwarder2;
-
-  //     if (forwarder1 && forwarder2 && forwarder1 === forwarder2) {
-  //       errors.forwarder2 = "Forwarder 1 and Forwarder 2 cannot be the same";
-  //     } else {
-  //       delete errors.forwarder2;
-  //     }
-  //   }
-
-  //   setFormErrors(errors);
-  // };
 
   const handleChange2 = (field, value) => {
     const upperValue = toUpperCase(value);
@@ -484,21 +452,12 @@ const DestuffLclContainer = () => {
 
   // Save handler
   const handleSave = async () => {
-    const formattedDestuffDate = moment(formData.destuffDate).format(
-      "YYYY-MM-DD"
-    );
+    const formattedDestuffDate = moment(
+      formData.destuffDate,
+      "DD-MM-YYYY"
+    ).format("YYYY-MM-DD");
     setIsLoading(true);
     const errors = { ...formErrors };
-
-    // Validation
-    // if (!formData2.destuffDate) {
-    //   errors.destuffDate = "Destuff Date is required";
-    // } else if (moment(formData2.destuffDate).isAfter(currentDate)) {
-    //   errors.destuffDate = "Destuff Date cannot be greater than current date";
-    // } else if (moment(formData2.destuffDate).isBefore(minAllowedDate)) {
-    //   errors.destuffDate =
-    //     "Destuff Date cannot be more than 3 days before current date";
-    // }
 
     if (
       formData2.forwarder1 &&
@@ -559,13 +518,14 @@ const DestuffLclContainer = () => {
           ? moment(formData2.cscValidity).format("YYYY-MM-DD")
           : null,
         seal_cutting_date: formData.sealCuttingDate
-          ? moment(formData.sealCuttingDate).format("YYYY-MM-DD")
+          ? moment(formData.sealCuttingDate, "DD-MM-YYYY").format("YYYY-MM-DD")
           : null,
       },
       formList: formList.map((item) => ({
         slNo: item.slNo,
         blAwnNumber: item.blAwnNumber || "",
-        blAwnDate: item.blAwnDate || "",
+        blAwnDate:
+          moment(item.blAwnDate, "DD-MM-YYYY").format("YYYY-MM-DD") || "",
         cargo: item.cargo,
         cargoWeight: parseFloat(item.cargoWeight),
         cbm: parseFloat(item.cbm),
@@ -577,9 +537,9 @@ const DestuffLclContainer = () => {
         number: item.number,
         remarks: item.remarks,
         tpNumber: item.tpNo || "",
-        tpDate: item.tpDate,
+        tpDate: moment(item.tpDate, "DD-MM-YYYY").format("YYYY-MM-DD"),
         igmNumber: item.igmNo || "",
-        igmDate: item.igmDate,
+        igmDate: moment(item.igmDate, "DD-MM-YYYY").format("YYYY-MM-DD"),
         consignee_name: item.consigneeName || "",
       })),
     };
@@ -592,7 +552,7 @@ const DestuffLclContainer = () => {
         toast.success(
           `YOU HAVE SUCCESSFULLY SAVED DESTUFFING-LCL OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${response.data.id}`
         );
-        localStorage.setItem("operation", "4");
+        localStorage.setItem("operation", 4);
         navigate(`/app/operation/Admin`, {
           state: {
             containerData: containerData,
@@ -611,7 +571,20 @@ const DestuffLclContainer = () => {
   };
 
   const handleDestuffDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -651,6 +624,11 @@ const DestuffLclContainer = () => {
         ...prev,
         [name]: "Date cannot be more than 3 days in the past",
       }));
+    } else if (inputDate.isBefore(arrivalDate)) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "Date cannot be before Arrival Date",
+      }));
     } else {
       setFormErrors((prev) => ({
         ...prev,
@@ -659,11 +637,21 @@ const DestuffLclContainer = () => {
     }
   };
 
-  console.log("Seal Cutting Date Date::", formData.sealCuttingDate);
-  console.log("Remarks::", formData.mainRemark);
-
   const handleDateChange = async (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -680,6 +668,7 @@ const DestuffLclContainer = () => {
       ".": "DD.MM.YYYY",
     };
     const inputDate = moment(value, formatMap[separator], true);
+    const destDate = moment(formData.destuffDate);
     // const current = moment(currentDate, "DD-MM-YYYY");
     // const minimum = moment(minAllowedDate, "DD-MM-YYYY");
 
@@ -692,6 +681,11 @@ const DestuffLclContainer = () => {
       setFormErrors((prev) => ({
         ...prev,
         [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
+      }));
+    } else if (inputDate.isAfter(destDate)) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "Seal cutting date cannot be after the destuff date",
       }));
     } else {
       setFormErrors((prev) => ({
@@ -1026,7 +1020,7 @@ const DestuffLclContainer = () => {
                         Cargo Detail - SL No: {form.slNo}
                       </h3>
                       <div className="row">
-                        {FIELDS_CONFIG.map(({ name, label }) => (
+                        {/* {FIELDS_CONFIG.map(({ name, label }) => (
                           <div key={name} className="col-md-4 mb-2">
                             <label className="form-label">{label}</label>
                             <input
@@ -1043,6 +1037,39 @@ const DestuffLclContainer = () => {
                                   : {}
                               }
                             />
+                          </div>
+                        ))} */}
+
+                        {FIELDS_CONFIG.map(({ name, label }) => (
+                          <div key={name} className="col-md-4 mb-2">
+                            <label className="form-label">{label}</label>
+                            <input
+                              type={getInputType(name)}
+                              value={form[name]}
+                              onChange={(e) =>
+                                handleChange(index, name, e.target.value)
+                              }
+                              className={`form-control ${
+                                form[`${name}Error`] ? "is-invalid" : ""
+                              }`}
+                              readOnly={name === "excess/short"}
+                              style={
+                                getInputType(name) === "number"
+                                  ? { appearance: "textfield" }
+                                  : {}
+                              }
+                              placeholder={
+                                getInputType(name) === "text" &&
+                                name.toLowerCase().includes("date")
+                                  ? "DD-MM-YYYY"
+                                  : ""
+                              }
+                            />
+                            {form[`${name}Error`] && (
+                              <span className="text-danger">
+                                {form[`${name}Error`]}
+                              </span>
+                            )}
                           </div>
                         ))}
                       </div>

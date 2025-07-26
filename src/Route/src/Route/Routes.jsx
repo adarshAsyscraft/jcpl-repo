@@ -234,6 +234,11 @@ import AddForwarders from "../Components/Dashboard/Forwarders/create";
 import Yard from "../Components/Dashboard/Yard";
 import AddYards from "../Components/Dashboard/Yard/AddYards";
 import StuffingProcessFetchDetails from "../../../Components/Operation/StuffingProcessFetchDetails";
+import Client from "../../../Components/Dashboard/Clients/client";
+import AddClient from "../../../Components/Dashboard/Clients/AddClient";
+import AddMeasurementRate from "../../../Components/Dashboard/MeasurementRate/AddMeasurementRate";
+import MeasurementRate from "../../../Components/Dashboard/MeasurementRate/MeasurementRate";
+import OnHireSurvey from "../../../Components/Operation/OnHireSurvey";
 
 export const routes = [
   {
@@ -287,6 +292,11 @@ export const routes = [
   {
     path: `${process.env.PUBLIC_URL}/app/on-hire/:containerNumber/:layout`,
     Component: <OnHire />,
+  },
+
+  {
+    path: `${process.env.PUBLIC_URL}/app/on-hire-survey/:containerNumber/:layout`,
+    Component: <OnHireSurvey />,
   },
   {
     path: `${process.env.PUBLIC_URL}/app/allotment-stuffing/:layout`,
@@ -342,6 +352,26 @@ export const routes = [
   {
     path: `${process.env.PUBLIC_URL}/dashboard/users/add/:layout`,
     Component: <AddUser />,
+  },
+
+  //Survey Client
+  {
+    path: `${process.env.PUBLIC_URL}/dashboard/survey-clients/:layout`,
+    Component: <Client />,
+  },
+  {
+    path: `${process.env.PUBLIC_URL}/dashboard/survey-clients/add/:layout`,
+    Component: <AddClient />,
+  },
+
+  //Measurement Rate
+  {
+    path: `${process.env.PUBLIC_URL}/measurement-rate/:layout`,
+    Component: <MeasurementRate />,
+  },
+  {
+    path: `${process.env.PUBLIC_URL}/measurement-rate/add/:layout`,
+    Component: <AddMeasurementRate />,
   },
 
   // Icds

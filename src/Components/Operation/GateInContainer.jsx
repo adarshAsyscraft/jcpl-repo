@@ -33,8 +33,6 @@ const gateInSchema = z
     inTime: z.string().nonempty("Gate In Time is required"),
     gateInFrom: z.string().nonempty("Gate In From is required"),
     loadStatus: z.string().nonempty("Load Status is required"),
-    forwarder1: z.string().nonempty("Forwarder 1 is required"),
-    forwarder2: z.string().nonempty("Forwarder 2 is required"),
     gateOutDate: z.string().nonempty("Gate Out Date is required"), // for validation only
   })
   .refine((data) => data.forwarder1 !== data.forwarder2, {
@@ -162,9 +160,9 @@ const GateIn = () => {
     setAllotmentVesselViaNumber(result.data.vessel_via_no);
   };
 
-  useEffect(() => {
-    getVesselViaNumber();
-  }, [containerNumber]);
+  // useEffect(() => {
+  //   getVesselViaNumber();
+  // }, [containerNumber]);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -176,6 +174,7 @@ const GateIn = () => {
         await dispatch(fetchYards());
         await dispatch(fetchTransporters());
         await getPreviousPageData();
+        await getVesselViaNumber();
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -458,7 +457,21 @@ const GateIn = () => {
   }
 
   const handleGateInDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
 
     // Validate format

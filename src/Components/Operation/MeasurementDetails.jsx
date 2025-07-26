@@ -27,6 +27,7 @@ const MeasurementDetails = () => {
   const forwardersState = useSelector((state) => state.forwarders || {});
   const forwarders = forwardersState?.data || [];
   const { icds, loading } = useSelector((state) => state.icd);
+  const [measurementRateData, setMeasurementRateData] = useState({});
   const dispatch = useDispatch();
 
   // Initialize formData as an empty object
@@ -36,7 +37,7 @@ const MeasurementDetails = () => {
     measurementDate: moment().format("DD-MM-YYYY"),
     typeOfPayment: "",
     shippingLine: "",
-    serviceTax: "",
+    serviceTax: "applicable",
     serviceTaxRate: "",
     shipperApplicant: "",
     clearingAgent: "",
@@ -50,14 +51,18 @@ const MeasurementDetails = () => {
     icdCfs: "",
     anyOtherRemarks: "",
     locationOfCargo: "",
+    measurementType: "export",
     paidBy: "",
     gstNumber: "",
+    formatType: "pdf",
+    receiptNeeded: "yes",
     packageIncludedInMinimumAmount: "",
     rateForAdditionalPackage: "",
     minimumAmount: "",
     additionalAmount: "",
     totalAmount: "",
     serviceTaxAmount: "",
+    gstRate: "",
   });
 
   const [formList, setFormList] = useState([
@@ -93,7 +98,6 @@ const MeasurementDetails = () => {
           : "",
         icdCfs: cartingItem.icd_dfs || "",
         locationOfCargo: cartingItem.location_of_cargo || "",
-        // Add other fields as needed
       }));
 
       // Parse and populate formList from cartingDimention_data
@@ -139,6 +143,7 @@ const MeasurementDetails = () => {
 
   useEffect(() => {
     dispatch(fetchForwarders());
+    dispatch(fetchICDs());
   }, [dispatch]);
 
   // Function to handle input changes
@@ -190,10 +195,6 @@ const MeasurementDetails = () => {
     );
   };
 
-  const cancelForm = (index) => {
-    setFormList((prevForms) => prevForms.filter((_, i) => i !== index));
-  };
-
   const handleChange = (e) => {
     let { name, value } = e.target;
 
@@ -204,18 +205,45 @@ const MeasurementDetails = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const getInputType = (field) => {
-    const lowerField = field.toLowerCase();
-    if (lowerField.includes("date")) return "date";
-    if (
-      lowerField.includes("number") ||
-      lowerField.includes("weight") ||
-      lowerField.includes("qty") ||
-      lowerField.includes("cbm")
-    )
-      return "number";
-    return "text";
+  const getMeasurementRate = async () => {
+    try {
+      const { measurementType, shippingLine } = formData;
+
+      if (measurementType && shippingLine) {
+        const payload = {
+          typeOfRate: measurementType,
+        };
+        const res = await operationService.getMeasurementRateData(
+          shippingLine,
+          payload
+        );
+
+        console.log("Response::", res);
+
+        if (res.success) {
+          setMeasurementRateData(res.data);
+          // Update formData based on the response
+          setFormData((prev) => ({
+            ...prev,
+            packageIncludedInMinimumAmount: res.data.packagesMinAmount || "",
+            rateForAdditionalPackage: res.data.additionalPackagesRate || "",
+            minimumAmount: res.data.minAmount || "",
+            serviceTaxRate: res.data.gstRate || "",
+            gstRate: res.data.gstRate || "",
+          }));
+        }
+      }
+    } catch (error) {
+      console.log("Error fetching measurement rate:", error);
+    }
   };
+
+  useEffect(() => {
+    if (formData.measurementType && formData.shippingLine) {
+      getMeasurementRate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.measurementType, formData.shippingLine]);
 
   const handleSave = async () => {
     const formattedMeasurementDate = moment(
@@ -231,6 +259,7 @@ const MeasurementDetails = () => {
     const payload = {
       ship_bill_no: formData.shipBillNumber || null,
       measurement_date: formattedMeasurementDate,
+      measurement_type: formData.measurementType,
       type_of_payment: formData.typeOfPayment,
       ship_line_forwarder_name: formData.shippingLine || "ABC Logistics",
       service_tax: parseFloat(formData.serviceTax) || 0,
@@ -270,11 +299,10 @@ const MeasurementDetails = () => {
       toast.success(
         `YOU HAVE SUCCESSFULLY SAVED MEASUREMENT OPERATION. WHERE ENTRY ID IS ${response.data.id}`
       );
-      navigate(`${process.env.PUBLIC_URL}/app/operation/Admin`);
     }
   };
 
-  console.log("cartingArray::", cartingData);
+  console.log("MeasurementData::", measurementRateData);
 
   const handleGo = useCallback(async () => {
     const value = formData.shipBillNumber;
@@ -321,9 +349,52 @@ const MeasurementDetails = () => {
     }
   }, [formData.shipBillNumber]);
 
-  const handleSearch = async () => {
-    console.log("hello handleSearch");
-  };
+  useEffect(() => {
+    const {
+      noOfPackages,
+      packageIncludedInMinimumAmount,
+      rateForAdditionalPackage,
+      minimumAmount,
+      gstRate,
+      serviceTax,
+    } = formData;
+
+    const numPackages = parseInt(noOfPackages) || 0;
+    const minPackages = parseInt(packageIncludedInMinimumAmount) || 0;
+    const rate = parseFloat(rateForAdditionalPackage) || 0;
+    const minAmount = parseFloat(minimumAmount) || 0;
+    const gst = parseFloat(gstRate) || 0;
+
+    let additionalAmount = 0;
+    let stAmount = 0;
+    let tAmount = 0;
+
+    if (numPackages > minPackages) {
+      additionalAmount = (numPackages - minPackages) * rate;
+    }
+
+    if (serviceTax === "applicable") {
+      stAmount = ((minAmount + additionalAmount) * gst) / 100;
+      tAmount = minAmount + additionalAmount + stAmount;
+    } else {
+      stAmount = 0.0;
+      tAmount = minAmount + additionalAmount;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      additionalAmount: additionalAmount.toFixed(2),
+      serviceTaxAmount: stAmount.toFixed(2),
+      totalAmount: tAmount.toFixed(2),
+    }));
+  }, [
+    formData.noOfPackages,
+    formData.packageIncludedInMinimumAmount,
+    formData.rateForAdditionalPackage,
+    formData.minimumAmount,
+    formData.gstRate,
+    formData.serviceTax,
+  ]);
 
   const handleDateChange = (e) => {
     const { name, value } = e.target;
@@ -387,17 +458,39 @@ const MeasurementDetails = () => {
     <Fragment>
       <Breadcrumbs mainTitle="Measurement" parent="Apps" title="Measurement" />
       <Container fluid={true} className="container-wrap">
-        <Row>
+        <Row className="mb-3">
           <Col sm="12">
             <div className="card shadow p-4">
               <Row className="mb-3">
                 <Col md="6">
-                  <label htmlFor="">Ship Bill Number</label>
+                  <label htmlFor="">Type of Measurement</label>
+                  <select
+                    name="measurementType"
+                    className="form-select"
+                    onChange={handleChange}
+                    value={formData.measurementType}
+                  >
+                    <option value="">Select Type</option>
+                    <option value="export">Export</option>
+                    <option value="import">Import</option>
+                  </select>
+                </Col>
+              </Row>
+              <Row className="mb-3">
+                <Col md="6">
+                  <label htmlFor="">
+                    {formData.measurementType == "export" ? "Ship Bill" : "BL"}{" "}
+                    Number
+                  </label>
                   <input
                     name="shipBillNumber"
                     type="text"
                     className="form-control"
-                    placeholder="Ship Bill Number"
+                    placeholder={
+                      formData.measurementType == "export"
+                        ? "Ship Bill Number"
+                        : "BL Number"
+                    }
                     onChange={handleChange}
                     value={formData.shipBillNumber}
                   />
@@ -433,14 +526,6 @@ const MeasurementDetails = () => {
               <Row className="mb-3">
                 <Col md="6">
                   <label htmlFor="">Type Of Payment</label>
-                  {/* <input
-                    name="typeOfPayment"
-                    type="text"
-                    className="form-control"
-                    placeholder="Payment Type"
-                    onChange={handleChange}
-                    value={formData.typeOfPayment}
-                  /> */}
                   <select
                     name="typeOfPayment"
                     className="form-select"
@@ -462,27 +547,17 @@ const MeasurementDetails = () => {
                     value={formData.shippingLine}
                   >
                     <option value="">Shipping Line Code Name</option>
-                    {forwarders
-                      .filter((res) => res.category === "shipping")
-                      .map((fwd) => (
-                        <option key={fwd.id} value={fwd.id}>
-                          {fwd.name}
-                        </option>
-                      ))}
+                    {forwarders.map((fwd) => (
+                      <option key={fwd.id} value={fwd.id}>
+                        {fwd.name}
+                      </option>
+                    ))}
                   </select>
                 </Col>
               </Row>
               <Row className="mb-3">
                 <Col md="6">
                   <label htmlFor="">GST</label>
-                  {/* <input
-                    name="serviceTax"
-                    type="text"
-                    className="form-control"
-                    placeholder="Service Tax"
-                    onChange={handleChange}
-                    value={formData.serviceTax}
-                  /> */}
                   <select
                     name="serviceTax"
                     className="form-select"
@@ -617,7 +692,7 @@ const MeasurementDetails = () => {
                 <Col md="6">
                   <label>ICD/CFS</label>
                   <select
-                    name="icdDfs"
+                    name="icdCfs"
                     onChange={handleChange}
                     value={formData.icdCfs}
                     className={`form-control`}
@@ -658,14 +733,6 @@ const MeasurementDetails = () => {
               <Row className="mb-3">
                 <Col md="6">
                   <label htmlFor="">Paid By</label>
-                  {/* <input
-                    name="paidBy"
-                    type="text"
-                    className="form-control"
-                    placeholder="Paid By"
-                    onChange={handleChange}
-                    value={formData.paidBy}
-                  /> */}
                   <select
                     name="paidBy"
                     className="form-select"
@@ -764,6 +831,9 @@ const MeasurementDetails = () => {
               </Row>
             </div>
             <div className="container mt-4">
+              <button onClick={addForm} className="btn btn-primary mt-3">
+                ➕ Add Row
+              </button>
               <table className="table table-bordered">
                 <thead className="bg-dark text-light">
                   <tr>
@@ -838,31 +908,57 @@ const MeasurementDetails = () => {
                   </tr>
                 </tbody>
               </table>
-
-              <button onClick={addForm} className="btn btn-primary mt-3">
-                ➕ Add Row
-              </button>
-
-              <div className="mt-3 text-center">
-                <button className="btn btn-success">SAVE</button>
-              </div>
-
-              <div className="mt-2 text-center">
-                <a href="#" className="text-primary">
-                  Search for Records
-                </a>
-              </div>
             </div>
-            <div className="mt-2 text-center">
-              <a href="#" className="text-primary">
-                Search for Records
-              </a>
-            </div>
-            <div className="text-center">
+
+            <div className="text-center mt-4">
               <button className="btn btn-primary w-100" onClick={handleSave}>
                 Save
               </button>
             </div>
+
+            <div className="container mt-4">
+              <Row className="mb-3">
+                <Col md="6">
+                  <label htmlFor="">
+                    {" "}
+                    <strong>Report Format Type</strong>
+                  </label>
+                  <select
+                    name="formatType"
+                    id=""
+                    className="form-select"
+                    value={formData.formatType}
+                  >
+                    <option value="">Select</option>
+                    <option value="excel">Excel</option>
+                    <option value="pdf">PDF</option>
+                  </select>
+                </Col>
+                <Col md="6">
+                  <label htmlFor="">
+                    {" "}
+                    <strong> Is Measurement Receipt Needed </strong>
+                  </label>
+                  <select
+                    name="receiptNeeded"
+                    id=""
+                    className="form-select"
+                    value={formData.receiptNeeded}
+                  >
+                    <option value="">Select</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                </Col>
+              </Row>
+
+              {/* Centered Generate Report Button with margin below */}
+              <div className="d-flex justify-content-center">
+                <button className="btn btn-danger">Generate Report</button>
+              </div>
+            </div>
+
+            {/* Save button with full width */}
           </Col>
         </Row>
       </Container>

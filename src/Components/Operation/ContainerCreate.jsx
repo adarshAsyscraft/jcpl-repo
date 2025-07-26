@@ -68,9 +68,12 @@ const ContainerCreate = () => {
     if (!data.type) newErrors.type = "Container Type is required.";
 
     // Strict MM-YYYY validation (01-12 for month)
-    if (data.mfdDate && !/^(0[1-9]|1[0-2])[-/.]\d{4}$/.test(data.mfdDate)) {
-      newErrors.mfdDate =
-        "Date must be in MM-YYYY, MM/YYYY, or MM.YYYY format with a valid month.";
+    if (data.mfdDate && data.mfdDate.trim() !== "") {
+      const isValidFormat = /^(0[1-9]|1[0-2])[-/.]\d{4}$/.test(data.mfdDate);
+      if (!isValidFormat) {
+        newErrors.mfdDate =
+          "Date must be in MM-YYYY format with a valid month.";
+      }
     }
 
     return newErrors;
@@ -85,6 +88,21 @@ const ContainerCreate = () => {
     // Numeric validation
     if (name === "tareWeight" && !/^\d{0,4}$/.test(value)) return;
     if (name === "mgWeight" && !/^\d{0,5}$/.test(value)) return;
+
+    if (name === "mfdDate") {
+      value = value.replace(/\D/g, ""); // Remove all non-digits
+      if (value.length > 6) return; // Max 6 digits
+
+      if (value.length >= 3) {
+        value = value.slice(0, 2) + "-" + value.slice(2);
+      }
+      const updatedFormData = { ...formData, [name]: value };
+      setFormData(updatedFormData);
+
+      const newErrors = validate(updatedFormData);
+      setErrors(newErrors);
+      return;
+    }
 
     const updatedFormData = { ...formData, [name]: value };
     setFormData(updatedFormData);
@@ -112,6 +130,9 @@ const ContainerCreate = () => {
       9: "/app/stuffing-lcl",
       10: "/app/gate-in-container",
       11: "/app/gate-out-container",
+      12: "/app/seven-point-checklist",
+      13: "/app/soc-inspection",
+      14: "/app/empty-container-inspection",
       15: "/app/dispatch-container",
       17: "/app/off-hire",
       18: "/app/on-hire",
@@ -119,6 +140,7 @@ const ContainerCreate = () => {
       20: "/app/allotment-er",
       21: "/app/de-allotment/:layout",
       22: "/app/measurement-details",
+      23: "/app/on-hire",
     };
 
     const route = operationRoutes[formData.operation];
@@ -137,12 +159,16 @@ const ContainerCreate = () => {
       "9",
       "10",
       "11",
+      "12",
+      "13",
+      "14",
       "15",
       "18",
       "19",
       "20",
       "21",
       "22",
+      "23",
     ]);
 
     const path = operationsWithContainerNumber.has(formData.operation)

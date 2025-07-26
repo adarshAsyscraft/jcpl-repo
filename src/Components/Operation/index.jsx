@@ -91,21 +91,44 @@ const Operation = () => {
 
   ////
 
+  // useEffect(() => {
+  //   const state = location?.state;
+
+  //   if (state?.operation) {
+  //     setSelectedOperation(state.operation);
+  //     localStorage.setItem("selectedOperation", state.operation);
+  //   } else {
+  //     const savedOperation = localStorage.getItem("selectedOperation");
+  //     if (savedOperation) {
+  //       setSelectedOperation(savedOperation);
+  //     }
+  //   }
+
+  //   if (state?.containerNumber) {
+  //     setContainerNumber(state.containerNumber);
+  //   }
+  // }, [location]);
+
   useEffect(() => {
     const state = location?.state;
 
     if (state?.operation) {
       setSelectedOperation(state.operation);
       localStorage.setItem("selectedOperation", state.operation);
+
+      if (state.operation === "7") {
+        setContainerNumber("NOT ASSIGNED");
+      } else if (state?.containerNumber) {
+        setContainerNumber(state.containerNumber);
+      }
     } else {
       const savedOperation = localStorage.getItem("selectedOperation");
       if (savedOperation) {
         setSelectedOperation(savedOperation);
+        if (savedOperation === "7") {
+          setContainerNumber("NOT ASSIGNED");
+        }
       }
-    }
-
-    if (state?.containerNumber) {
-      setContainerNumber(state.containerNumber);
     }
   }, [location]);
 
@@ -196,7 +219,7 @@ const Operation = () => {
         return;
       }
 
-      if ([8, 9, 6].includes(lastOp)) {
+      if ([8, 24, 6].includes(lastOp)) {
         // Container is considered loaded – allowed
       } else if (lastOp === 20) {
         // Container is considered empty – allowed
@@ -332,11 +355,12 @@ const Operation = () => {
       14: "/app/empty-container-inspection",
       15: "/app/dispatch-container",
       17: "/app/off-hire",
-      18: "/app/on-hire",
+      18: "/app/on-hire-survey",
       19: "/app/allotment-stuffing",
       20: "/app/allotment-er",
       21: "/app/de-allotment",
       22: "/app/measurement-details",
+      23: "/app/on-hire",
     };
 
     const directRoutes = ["3", "4", "5", "7", "8", "22", "9"];
@@ -362,6 +386,7 @@ const Operation = () => {
       "19",
       "20",
       "21",
+      "23",
     ];
 
     if (allOperationsWithCheck.includes(selectedOperation)) {
@@ -387,12 +412,12 @@ const Operation = () => {
 
       // Skip navigate if check failed
       if (shouldNavigate) {
-        if (selectedOperation == "6" && allotmentType != "icd-stuffing") {
+        if (selectedOperation == "6" && allotmentType != "ICD-STUFFING") {
           toast.error("This container is not valid for ICD Stuffing");
           return;
         }
 
-        if (selectedOperation === "8" && allotmentType !== "factory-stuffing") {
+        if (selectedOperation === "8" && allotmentType !== "FACTORY-STUFFING") {
           toast.error("This container is not valid for Factory Stuffing");
           return;
         }
@@ -445,7 +470,8 @@ const Operation = () => {
                       <option value="14">Empty Container Inspection</option>
                       <option value="15">Dispatch</option>
                       <option value="17">Off Hire</option>
-                      <option value="18">On Hire</option>
+                      <option value="23">On Hire</option>
+                      <option value="18">On Hire Survey</option>
                       <option value="19">Allotment Stuffing</option>
                       <option value="20">Allotment E.R</option>
                       <option value="21">De-Allotment</option>

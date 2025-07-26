@@ -207,7 +207,8 @@ const GateOutContainer = () => {
         wagonNumber: arrivalData.wagon_number || "",
         entryId: arrivalData.id || arrivalData,
         trainTruckNumber: arrivalData.train_truck_number || "",
-        shippingLineSealNumber: arrivalData.seal_no || "",
+        shippingLineSealNumber:
+          arrivalData.seal_no || arrivalData?.ship_line || "",
         anyOtherRemarks:
           arrivalData.other_remarks || arrivalData.anyOtherRemarks || "",
         lastUpdateDate: moment(arrivalData.updated_at).format("DD-MM-YYYY"),
@@ -219,11 +220,13 @@ const GateOutContainer = () => {
             })
           : null,
         shipLine: arrivalData.shipline || "",
+        custom: arrivalData.custom || "",
         transporter:
           arrivalData.transporter_id || arrivalData?.transporter || "",
         // custom: arrivalData.custom || "",
         other: arrivalData.other || "",
-        otherSealDescription: arrivalData.other_description || "",
+        otherSealDescription:
+          arrivalData.other_description || arrivalData.other_seal_desc || "",
         otherRemarks:
           arrivalData.other_remarks || arrivalData.anyOtherRemarks || "",
         containerRemark: arrivalData.remarks || arrivalData.remark || "",
@@ -272,6 +275,7 @@ const GateOutContainer = () => {
     if (!formData.getOutFor) newErrors.getOutFor = "Get Out For is required";
     if (!formData.outDate) newErrors.outDate = "Out Date is required";
     if (!formData.outTime) newErrors.outTime = "Out Time is required";
+    if (!formData.loadStatus) newErrors.loadStatus = "Load Status is required";
 
     // Forwarder validation
     if (
@@ -406,7 +410,21 @@ const GateOutContainer = () => {
   };
 
   const handleGateOutDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    // Remove all non-digit characters first
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -425,6 +443,7 @@ const GateOutContainer = () => {
     const inputDate = moment(value, formatMap[separator], true);
     const current = moment(currentDate, "DD-MM-YYYY");
     const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+    const arrival = moment(formData.arrivalDate, "DD-MM-YYYY");
 
     if (!value) {
       setErrors((prev) => ({
@@ -445,6 +464,11 @@ const GateOutContainer = () => {
       setErrors((prev) => ({
         ...prev,
         [name]: "Out Date cannot be more than 3 days in the past",
+      }));
+    } else if (inputDate.isBefore(arrival)) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Out Date cannot be before Arrival Date",
       }));
     } else {
       setErrors((prev) => ({
@@ -1091,7 +1115,7 @@ const GateOutContainer = () => {
                         <Label className="large mb-1">Select Yard</Label>
 
                         <select
-                          name="destinationPlace"
+                          name="yard"
                           className="form-select"
                           onChange={handleChange}
                           value={formData.yard}
@@ -1112,7 +1136,7 @@ const GateOutContainer = () => {
                       <>
                         <Label className="large mb-1">Select ICD</Label>
                         <select
-                          name="destinationPlace"
+                          name="icd"
                           className="form-select"
                           onChange={handleChange}
                           value={formData.icd}
@@ -1134,11 +1158,7 @@ const GateOutContainer = () => {
                             className="form-control"
                             placeholder="Enter Port Name"
                             onChange={handleChange}
-                            value={
-                              (arrivalData.getOutFor == "Dispatch to PORT" &&
-                                formData.port) ||
-                              ""
-                            }
+                            value={formData.port}
                           />
                         </>
                       )
@@ -1175,9 +1195,7 @@ const GateOutContainer = () => {
                       className="form-select"
                       onChange={handleChange}
                       value={
-                        arrivalData.loadStatus
-                          ? arrivalData.loadStatus
-                          : "empty"
+                        formData.loadStatus ? formData.loadStatus : "empty"
                       }
                     >
                       <option value="">Load Status</option>

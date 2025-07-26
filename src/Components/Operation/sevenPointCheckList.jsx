@@ -1,4 +1,10 @@
-import React, { Fragment, useContext, useEffect, useState } from "react";
+import React, {
+  Fragment,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Breadcrumbs } from "../../AbstractElements";
 import { Col, Container, Row, Label } from "reactstrap";
@@ -12,6 +18,8 @@ import { fetchYards } from "../../Redux/slices/yardSlice";
 import operationService from "../../Services/operation";
 import { toast } from "react-toastify";
 import moment from "moment";
+import ImageUploadWithPreview from "../Common/ImageUpload/ImageUpload";
+import SelectableInput from "../Common/SelectableInput/selectableInput";
 
 const SevenPointCheckList = () => {
   const { layoutURL } = useContext(CustomizerContext);
@@ -23,12 +31,12 @@ const SevenPointCheckList = () => {
   const { fetchedContainer } = useSelector((state) => state.container);
   const { icds } = useSelector((state) => state.icd);
   const yards = useSelector((state) => state.yards);
-  const [formErrors, setFormErrors] = useState({});
   const { data: forwarders = [] } = useSelector(
     (state) => state.forwarders || {}
   );
   const currentDate = moment().format("DD-MM-YYYY");
   const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
+  const [formErrors, setFormErrors] = useState({});
 
   const [formData, setFormData] = useState({
     containerNumber: fetchedContainer?.container_number || "",
@@ -45,18 +53,38 @@ const SevenPointCheckList = () => {
     transportMode: "",
     loadStatus: "",
     yardName: "",
+    customYard: "",
     pol: "",
     shippingLineSeal: "",
     containerCondition: "",
     anyOtherCondition: "",
     dateOfInspection: "",
     nameOfIcd: "",
+    customICD: "",
     inspectedBy: "",
-    remarks: fetchedContainer?.remarks || "",
+    frontWall: "ok",
+    leftSideWall: "ok",
+    rightSideWall: "ok",
+    floor: "ok",
+    roof: "ok",
+    doors: "ok",
+    outSide: "not-sighted",
+    containerRemark:
+      "CONTAINER INSPECTED IN STACK AND FIT FOR STUFFING SUBJECT TO PROPER CLEANING",
+    bookingNo: "",
   });
 
+  console.log("Fetched COntainer::", fetchedContainer);
+
+  const [images, setImages] = useState([]);
+
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    if (name == "containerRemark" || e.target.type == "text") {
+      value = value.toUpperCase();
+    }
+
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -110,30 +138,87 @@ const SevenPointCheckList = () => {
   };
 
   const handleSave = async () => {
-    const payload = {
-      containerNumber: formData.containerNumber || "",
-      client_name: formData.client_name || "", //
-      size_type: "20ft Standard", //
-      tare_weight: formData.tareWeight || "",
-      mg_weight: formData.mfdDate || "",
-      mfd_date: formData.mfdDate || "",
-      csc_validity: formData.cscValidity || "",
-      manufactured_by: formData?.manufactured_by || 1, //
-      date_of_inspection:
-        moment(formData.dateOfInspection, "DD-MM-YYYY").format("YYYY-MM-DD") ||
-        "",
-      name_of_icd: formData.nameOfIcd || "",
-      yard_name: formData.yardName || "",
-      inspected_by: parseInt(formData.inspectedBy) || "",
-      container_condition: formData.containerCondition || "Good",
-    };
+    const formDataToSend = new FormData();
 
-    const response = await operationService.sevenPointCheckList(payload);
-    if (response.success) {
-      toast.success(
-        `YOU HAVE SUCCESSFULLY SAVED 7 POINT CHECK LIST OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${response.data.id}`
+    // Helper function to convert empty strings to null
+    const toNullIfEmpty = (value) => (value === "" ? null : value);
+    const formattedDateOfInspection = moment(
+      formData.dateOfInspection,
+      "DD-MM-YYYY"
+    ).format("YYYY-MM-DD");
+
+    // Append all fields with proper null handling
+    formDataToSend.append("containerNumber", formData.containerNumber || "");
+    formDataToSend.append("client_name", toNullIfEmpty(formData.shippingLine));
+    formDataToSend.append("size_type", toNullIfEmpty(formData.size));
+    formDataToSend.append("tare_weight", toNullIfEmpty(formData.tareWeight));
+    formDataToSend.append("mg_weight", toNullIfEmpty(formData.mgWeight));
+    formDataToSend.append("mfd_date", toNullIfEmpty(formData.mfdDate));
+    formDataToSend.append("csc_validity", toNullIfEmpty(formData.cscValidity));
+    formDataToSend.append(
+      "manufactured_by",
+      toNullIfEmpty(formData.transportMode)
+    );
+    formDataToSend.append(
+      "date_of_inspection",
+      toNullIfEmpty(formattedDateOfInspection)
+    );
+    formDataToSend.append(
+      "name_of_icd",
+      toNullIfEmpty(
+        formData.nameOfIcd === "other" ? formData.customICD : formData.nameOfIcd
+      )
+    );
+    formDataToSend.append("booking_no", toNullIfEmpty(formData.bookingNo));
+    formDataToSend.append(
+      "yard_name",
+      toNullIfEmpty(
+        formData.yardName === "other" ? formData.customYard : formData.yardName
+      )
+    );
+    formDataToSend.append("inspected_by", toNullIfEmpty(formData.inspectedBy));
+    formDataToSend.append(
+      "container_condition",
+      toNullIfEmpty(formData.containerRemark)
+    );
+    formDataToSend.append("front_panel", toNullIfEmpty(formData.frontWall));
+    formDataToSend.append(
+      "left_side_panel",
+      toNullIfEmpty(formData.leftSideWall)
+    );
+    formDataToSend.append(
+      "right_side_panel",
+      toNullIfEmpty(formData.rightSideWall)
+    );
+    formDataToSend.append("floor", toNullIfEmpty(formData.floor));
+    formDataToSend.append("roof_panel", toNullIfEmpty(formData.roof));
+    formDataToSend.append("door_panels", toNullIfEmpty(formData.doors));
+    formDataToSend.append("under_structure", toNullIfEmpty(formData.outSide));
+
+    // Append images
+    images.forEach((image) => {
+      formDataToSend.append("images", image.file);
+    });
+
+    console.log("FormData::", formData);
+
+    try {
+      const response = await operationService.sevenPointCheckList(
+        formDataToSend
       );
-      navigate(`${process.env.PUBLIC_URL}/app/operation/Admin`);
+      if (response.success) {
+        toast.success(
+          `YOU HAVE SUCCESSFULLY SAVED SEVEN-POINT CHECKLIST OPERATION FOR ${fetchedContainer?.container_number}. WHERE ENTRY ID IS ${response.data.id}`
+        );
+        navigate(`${process.env.PUBLIC_URL}/app/operation/Admin`);
+      }
+      console.log("Payload::", formDataToSend);
+    } catch (error) {
+      console.log("Payload::", formDataToSend);
+      toast.error(error.response?.data?.message || "Error saving checklist");
+      console.error("Error:", error);
+    } finally {
+      images.forEach((image) => URL.revokeObjectURL(image.preview));
     }
   };
 
@@ -142,6 +227,10 @@ const SevenPointCheckList = () => {
     dispatch(fetchContainerByNumber(containerNumber));
     dispatch(fetchICDs());
     dispatch(fetchYards());
+
+    return () => {
+      images.forEach((image) => URL.revokeObjectURL(image.preview));
+    };
   }, []);
 
   return (
@@ -179,7 +268,7 @@ const SevenPointCheckList = () => {
                     value={formData.dateOfInspection}
                     max={currentDate}
                     min={minAllowedDate}
-                    placeholder="Arrival date"
+                    placeholder="DD-MM-YYYY"
                   />
                   {formErrors.dateOfInspection && (
                     <div className="invalid-feedback">
@@ -188,7 +277,7 @@ const SevenPointCheckList = () => {
                   )}
                 </Col>
                 <Col md="6">
-                  <label>Name Of ICD</label>
+                  <Label className="mb-1">Name Of ICD</Label>
                   <select
                     name="nameOfIcd"
                     className="form-select"
@@ -197,61 +286,172 @@ const SevenPointCheckList = () => {
                   >
                     <option value="">Select ICD</option>
                     {icds &&
-                      icds.map((res) => {
-                        return (
+                      icds.map((res) => (
+                        <>
                           <option key={res.id} value={res.id}>
                             {res.name}
                           </option>
-                        );
-                      })}
+                        </>
+                      ))}
+                    <option value="other">Other</option>
                   </select>
+                  {formData.nameOfIcd == "other" && (
+                    <input
+                      className="form-control mt-2"
+                      name="customICD"
+                      value={formData.customICD}
+                      onChange={handleChange}
+                      placeholder="Enter Custom ICD"
+                    />
+                  )}
                 </Col>
               </Row>
-
               <Row className="mb-3">
                 <Col md="6">
-                  <label>Yard Name</label>
+                  <Label className="mb-1">Yard Name</Label>
                   <select
-                    name="nameOfYard"
+                    name="yardName"
                     className="form-select"
                     onChange={handleChange}
-                    value={formData.nameOfYard}
+                    value={formData.yardName}
                   >
                     <option value="">Select Yard</option>
                     {yards &&
                       yards.data &&
-                      yards.data.map((res) => {
-                        return (
-                          <option key={res.id} value={res.id}>
-                            {res.name}
-                          </option>
-                        );
-                      })}
+                      yards.data.map((res) => (
+                        <option key={res.id} value={res.id}>
+                          {res.name}
+                        </option>
+                      ))}
+                    <option value="other">Other</option>
                   </select>
+                  {formData.yardName == "other" && (
+                    <input
+                      className="form-control mt-2"
+                      name="customYard"
+                      value={formData.customYard}
+                      onChange={handleChange}
+                      placeholder="Enter Custom Yard"
+                    />
+                  )}
                 </Col>
                 <Col md="6">
-                  <Label className="mb-1 ">Inspected By</Label>
+                  <Label className="mb-1">Inspected By</Label>
                   <input
                     name="inspectedBy"
                     type="text"
                     className="form-control"
                     onChange={handleChange}
                     value={formData.inspectedBy}
+                    placeholder="Inspected By*"
                   />
                 </Col>
               </Row>
 
-              <h5 className="mb-3 mt-4">Container Condition</h5>
+              <Row>
+                <Col md="6">
+                  <Label className="mb-1">Booking Number</Label>
+                  <input
+                    className="form-control"
+                    name="bookingNo"
+                    value={formData.bookingNo}
+                    onChange={handleChange}
+                    placeholder="Booking Number *"
+                  />
+                </Col>
+              </Row>
+
+              <h5 className="mb-3 mt-4">
+                Inspection Point As Per 7-Point Check
+              </h5>
 
               <Row className="mb-3">
+                <Col md="4">
+                  <SelectableInput
+                    label="Front Wall"
+                    name="frontWall"
+                    value={formData.frontWall}
+                    handleChange={handleChange}
+                  />
+                </Col>
+                <Col md="4">
+                  <SelectableInput
+                    label="Left Side Wall"
+                    name="leftSideWall"
+                    value={formData.leftSideWall}
+                    handleChange={handleChange}
+                  />
+                </Col>
+                <Col md="4">
+                  <SelectableInput
+                    label="Right Side Wall"
+                    name="rightSideWall"
+                    value={formData.rightSideWall}
+                    handleChange={handleChange}
+                  />
+                </Col>
+              </Row>
+
+              <Row>
+                <Col md="4">
+                  <SelectableInput
+                    label="Floor"
+                    name="floor"
+                    value={formData.floor}
+                    handleChange={handleChange}
+                  />
+                </Col>
+                <Col md="4">
+                  <SelectableInput
+                    label="Roof"
+                    name="roof"
+                    value={formData.roof}
+                    handleChange={handleChange}
+                  />
+                </Col>
+                <Col md="4">
+                  <SelectableInput
+                    label="Doors"
+                    name="doors"
+                    value={formData.doors}
+                    handleChange={handleChange}
+                  />
+                </Col>
+              </Row>
+
+              <Row>
                 <Col md="6">
-                  <Label className="mb-1 ">Remarks</Label>
+                  <SelectableInput
+                    label="Outside/UNDERCARRIAGE"
+                    name="outSide"
+                    // options={["not-sighted"]}
+                    value={formData.outSide}
+                    handleChange={handleChange}
+                  />
+                </Col>
+              </Row>
+
+              <Row className="mb-3">
+                <Col md="12 mt-3">
+                  <Label className="mb-1">
+                    <b>Upload Inspection Images</b>
+                  </Label>
+                  <ImageUploadWithPreview
+                    images={images}
+                    setImages={setImages}
+                  />
+                </Col>
+              </Row>
+
+              <Row className="mb-3">
+                <Col md="12">
+                  <Label className="mb-1">Remarks</Label>
                   <textarea
-                    name="remarks"
+                    name="containerRemark"
                     className="form-control"
                     rows="3"
                     onChange={handleChange}
-                    value={formData.remarks}
+                    value={formData.containerRemark}
                     placeholder="Remarks"
                   ></textarea>
                 </Col>
