@@ -29,6 +29,7 @@ const EmptyContainerInspection = () => {
   const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
   const [formErrors, setFormErrors] = useState({});
   const [images, setImages] = useState([]);
+  const [surveyClient, setSurveyClient] = useState([]);
 
   const { fetchedContainer } = useSelector((state) => state.container);
   const { data: forwarders = [] } = useSelector(
@@ -39,14 +40,15 @@ const EmptyContainerInspection = () => {
   );
 
   const [formData, setFormData] = useState({
-    containerNumber,
-    shippingLine: "",
-    size: "",
-    type: "",
-    tareWeight: "",
-    mgWeight: "",
-    mfdDate: "",
-    cscValidity: "",
+    containerNumber: fetchedContainer.container_number || "",
+    shippingLineId: fetchedContainer?.shipping_line_id || "",
+    size: fetchedContainer.size || "",
+    type: fetchedContainer.container_type || "",
+    tareWeight: fetchedContainer.tare_weight || "",
+    mgWeight: fetchedContainer.mg_weight || "",
+    mfdDate: fetchedContainer.mfd_date || "",
+    cscValidity: fetchedContainer.csc_validity || "",
+    remark: fetchedContainer.remark || "",
     operation: selectedOperation,
     forwarder1: "",
     forwarder2: "",
@@ -56,7 +58,9 @@ const EmptyContainerInspection = () => {
     nameOfIcd: "",
     customICD: "",
     customYard: "",
+    clientName: "",
     inspectedBy: "",
+    bookingNumber: "",
     dateOfInspection: "",
     rightSidePanel: "ok",
     leftSidePanel: "ok",
@@ -75,22 +79,6 @@ const EmptyContainerInspection = () => {
   });
 
   useEffect(() => {
-    if (fetchedContainer) {
-      setFormData((prev) => ({
-        ...prev,
-        containerNumber: fetchedContainer.container_number || "",
-        shippingLine: fetchedContainer.shipping_line_id || "",
-        size: fetchedContainer.size || "",
-        type: fetchedContainer.container_type || "",
-        tareWeight: fetchedContainer.tare_weight || "",
-        mgWeight: fetchedContainer.mg_weight || "",
-        mfdDate: fetchedContainer.mfd_date || "",
-        cscValidity: fetchedContainer.csc_validity || "",
-      }));
-    }
-  }, [fetchedContainer]);
-
-  useEffect(() => {
     dispatch(fetchContainerByNumber(containerNumber));
     dispatch(fetchForwarders());
     dispatch(fetchContainerTypes());
@@ -107,7 +95,20 @@ const EmptyContainerInspection = () => {
   };
 
   const handleDateChange = async (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -155,51 +156,79 @@ const EmptyContainerInspection = () => {
     }
   };
 
-  //   const handleSave = async () => {
-  //     const payload = {
-  //       containerNumber: fetchedContainer.container_number || "",
-  //       client_name: fetchedContainer.shipping_line_id || "",
-  //       size_type: fetchedContainer.size || "",
-  //       // type: fetchedContainer.container_type || "",
-  //       tare_weight: fetchedContainer.tare_weight || "",
-  //       mg_weight: fetchedContainer.mg_weight || "",
-  //       mfd_date: fetchedContainer.mfd_date || "",
-  //       csc_validity: fetchedContainer.csc_validity || "",
-  //       //   containerNumber: "ABD1234567",
-  //       //   client_name: "XYZ Logistics",
-  //       //   size_type: "40ft HC",
-  //       //   tare_weight: 2200.5,
-  //       //   mg_weight: 30480.0,
-  //       //   mfd_date: "2024-03-01",
-  //       //   csc_validity: "2026-03-01",
-  //       manufactured_by: 1,
-  //       date_of_inspection:
-  //         moment(formData.dateOfInspection, "DD-MM-YYYY").format("YYYY-MM-DD") ||
-  //         "",
-  //       name_of_icd:
-  //         formData.nameOfIcd == "other" ? formData.customICD : formData.nameOfIcd,
-  //       yard_name:
-  //         formData.yardName == "other" ? formData.customYard : formData.yardName,
-  //       inspected_by: formData.inspectedBy,
-  //       container_condition: null,
-  //       right_side_panel: formData.rightSidePanel,
-  //       left_side_panel: formData.leftSidePanel,
-  //       front_panel: formData.frontPanel,
-  //       door_panels: formData.door,
-  //       roof_panel: formData.roof,
-  //       floor: formData.floors,
-  //       internal_panels: formData.internalPanel,
-  //       under_structure: formData.underStructure,
-  //     };
+  const fetchSurveyClient = async () => {
+    const res = await operationService.getClientSurvey();
+    setSurveyClient(res.data);
+  };
 
-  //     const response = await operationService.emptyContainerInspection(payload);
-  //     if (response.success) {
-  //       toast.success("Empty Container Empty created successfully");
-  //       navigate(`${process.env.PUBLIC_URL}/app/operation/Admin`);
-  //     }
-  //   };
+  useEffect(() => {
+    fetchSurveyClient();
+  }, []);
 
   const handleSave = async () => {
+    const mandatoryFields = {
+      clientName: "Survey Client",
+      dateOfInspection: "Inspection Date",
+      nameOfIcd: "ICD Name",
+      yardName: "Yard Name",
+      inspectedBy: "Inspected By",
+    };
+
+    if (formData.nameOfIcd === "other") {
+      mandatoryFields.customICD = "Custom Yard";
+    }
+    if (formData.yardName == "other") {
+      mandatoryFields.customYard = "Custom Yard";
+    }
+
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (field) => !formData[field]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+
+      const newErrors = {};
+      emptyFields.forEach((field) => {
+        newErrors[field] = `${mandatoryFields[field]} is required`;
+      });
+      setFormErrors(newErrors);
+
+      return;
+    }
+
+    const inputDate = moment(formData.dateOfInspection, "DD-MM-YYYY");
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!inputDate.isValid()) {
+      toast.error("Invalid Date of Inspection");
+      setFormErrors((prev) => ({
+        ...prev,
+        dateOfInspection: "Invalid Date",
+      }));
+      return;
+    }
+    if (inputDate.isAfter(current)) {
+      toast.error("Inspection Date Cannot be in Future");
+      setFormErrors((prev) => ({
+        ...prev,
+        dateOfInspection: "Date cannot be in future",
+      }));
+      return;
+    }
+    if (inputDate.isBefore(minimum)) {
+      toast.error("Inspection Date cannot be more than 3 days in the past ");
+      setFormErrors((prev) => ({
+        ...prev,
+        dateOfInspection: "Date cannot be more than 3 days in the past",
+      }));
+      return;
+    }
+
     const formDataToSend = new FormData();
 
     // Helper function to convert empty strings to null
@@ -239,6 +268,7 @@ const EmptyContainerInspection = () => {
       "container_condition",
       toNullIfEmpty(formData.containerRemarks)
     );
+    formDataToSend.append("clientName", toNullIfEmpty(formData.clientName));
     formDataToSend.append("front_panel", toNullIfEmpty(formData.frontPanel));
     formDataToSend.append(
       "left_side_panel",
@@ -272,7 +302,7 @@ const EmptyContainerInspection = () => {
       );
       if (response.success) {
         toast.success(
-          `YOU HAVE SUCCESSFULLY SAVED SEVEN-POINT CHECKLIST OPERATION FOR ${fetchedContainer?.container_number}. WHERE ENTRY ID IS ${response.data.id}`
+          `YOU HAVE SUCCESSFULLY SAVED EMPTY CONTAINER INSPECTION OPERATION FOR ${fetchedContainer?.container_number}. WHERE ENTRY ID IS ${response.data.id}`
         );
         navigate(`${process.env.PUBLIC_URL}/app/operation/Admin`);
       }
@@ -304,102 +334,158 @@ const EmptyContainerInspection = () => {
                 disabled={true}
               />
 
+              <h5 className="mb-3 mt-5">Survey Client</h5>
               <Row className="mb-3">
                 <Col md="6">
-                  <label className="mb-1 ">Date of Inspection</label>
-                  <input
-                    name="dateOfInspection"
-                    type="text"
-                    className={`form-control ${
-                      formErrors.dateOfInspection ? "is-invalid" : ""
-                    }`}
-                    onChange={handleDateChange}
-                    value={formData.dateOfInspection}
-                    max={currentDate}
-                    min={minAllowedDate}
-                    placeholder="DD-MM-YYYY"
-                  />
-                  {formErrors.dateOfInspection && (
-                    <div className="invalid-feedback">
-                      {formErrors.dateOfInspection}
-                    </div>
-                  )}
-                </Col>
-                <Col md="6">
-                  <label className="form-label">Inspected By</label>
-                  <input
-                    placeholder="Inspected By"
-                    name="inspectedBy"
-                    type="text"
-                    className="form-control"
-                    value={formData.inspectedBy}
+                  <Label className="mb-1 ">
+                    Survey Client{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </Label>
+                  <select
+                    name="clientName"
+                    id=""
+                    className="form-select"
+                    value={formData.clientName}
                     onChange={handleChange}
-                  />
+                  >
+                    <option value="">Select Survey CLient</option>
+                    {surveyClient.map((client) => {
+                      return (
+                        <option value={client.clientName}>
+                          {client.clientName}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </Col>
               </Row>
 
-              <Row className="mb-3 mt-4">
-                <Col md="6">
-                  <label>Name Of ICD</label>
-                  <select
-                    name="nameOfIcd"
-                    className="form-select"
-                    onChange={handleChange}
-                    value={formData.nameOfIcd}
-                  >
-                    <option value="">Select ICD</option>
-                    {icds &&
-                      icds.map((res) => {
-                        return (
-                          <option key={res.id} value={res.id}>
-                            {res.name}
-                          </option>
-                        );
-                      })}
-                    <option value="other">Other</option>
-                  </select>
-                  {formData.nameOfIcd == "other" && (
+              <div className="shadow-sm p-2 mt-3">
+                <h5 className="mb-3 mt-5">
+                  Empty Container Inspection Survey Details
+                </h5>
+                <Row className="mb-3 mt-2">
+                  <Col md="6">
+                    <label className="mb-1 ">
+                      Date of Inspection{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
-                      className="form-control mt-2"
-                      name="customICD"
-                      value={formData.customICD}
-                      onChange={handleChange}
-                      placeholder="Enter Custom ICD"
+                      name="dateOfInspection"
+                      type="text"
+                      className={`form-control ${
+                        formErrors.dateOfInspection ? "is-invalid" : ""
+                      }`}
+                      onChange={handleDateChange}
+                      value={formData.dateOfInspection}
+                      max={currentDate}
+                      min={minAllowedDate}
+                      placeholder="DD-MM-YYYY"
                     />
-                  )}
-                </Col>
+                    {formErrors.dateOfInspection && (
+                      <div className="invalid-feedback">
+                        {formErrors.dateOfInspection}
+                      </div>
+                    )}
+                  </Col>
+                  <Col md="6">
+                    <label className="form-label">
+                      Inspected By{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
+                    <input
+                      placeholder="Inspected By"
+                      name="inspectedBy"
+                      type="text"
+                      className="form-control"
+                      value={formData.inspectedBy}
+                      onChange={handleChange}
+                    />
+                  </Col>
+                </Row>
 
-                <Col md="6">
-                  <label>Yard Name</label>
-                  <select
-                    name="yardName"
-                    className="form-select"
-                    onChange={handleChange}
-                    value={formData.yardName}
-                  >
-                    <option value="">Select Yard</option>
-                    {yards &&
-                      yards.data &&
-                      yards.data.map((res) => {
-                        return (
-                          <option key={res.id} value={res.id}>
-                            {res.name}
-                          </option>
-                        );
-                      })}
-                    <option value="other">Other</option>
-                  </select>
-                  {formData.yardName == "other" && (
-                    <input
-                      className="form-control mt-2"
-                      name="customYard"
-                      value={formData.customYard}
+                <Row className="mb-3 mt-4">
+                  <Col md="6">
+                    <label>
+                      Name Of ICD{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
+                    <select
+                      name="nameOfIcd"
+                      className="form-select"
                       onChange={handleChange}
-                      placeholder="Enter Custom Yard"
+                      value={formData.nameOfIcd}
+                    >
+                      <option value="">Select ICD</option>
+                      {icds &&
+                        icds.map((res) => {
+                          return (
+                            <option key={res.id} value={res.id}>
+                              {res.name}
+                            </option>
+                          );
+                        })}
+                      <option value="other">Other</option>
+                    </select>
+                    {formData.nameOfIcd == "other" && (
+                      <input
+                        className="form-control mt-2"
+                        name="customICD"
+                        value={formData.customICD}
+                        onChange={handleChange}
+                        placeholder="Enter Custom ICD"
+                      />
+                    )}
+                  </Col>
+
+                  <Col md="6">
+                    <label>
+                      Yard Name{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
+                    <select
+                      name="yardName"
+                      className="form-select"
+                      onChange={handleChange}
+                      value={formData.yardName}
+                    >
+                      <option value="">Select Yard</option>
+                      {yards &&
+                        yards.data &&
+                        yards.data.map((res) => {
+                          return (
+                            <option key={res.id} value={res.id}>
+                              {res.name}
+                            </option>
+                          );
+                        })}
+                      <option value="other">Other</option>
+                    </select>
+                    {formData.yardName == "other" && (
+                      <input
+                        className="form-control mt-2"
+                        name="customYard"
+                        value={formData.customYard}
+                        onChange={handleChange}
+                        placeholder="Enter Custom Yard"
+                      />
+                    )}
+                  </Col>
+                </Row>
+                <Row className="mb-3 mt-2">
+                  <Col md="6">
+                    <label className="form-label">Booking Number</label>
+                    <input
+                      placeholder="Booking Number"
+                      name="bookingNumber"
+                      type="text"
+                      className="form-control"
+                      value={formData.bookingNumber}
+                      onChange={handleChange}
                     />
-                  )}
-                </Col>
-              </Row>
+                  </Col>
+                </Row>
+              </div>
 
               <h5 className="mb-3 mt-4">Description of Part</h5>
 

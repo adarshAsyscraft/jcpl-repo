@@ -77,6 +77,7 @@ const GateIn = () => {
   const [gateOutDate, setGateOutDate] = useState(null);
   const currentDate = useMemo(() => moment().format("DD-MM-YYYY"), []);
   const { data: yards } = useSelector((state) => state.yards || {});
+  const [isLoading, setIsLoading] = useState(false);
   const minAllowedDate = useMemo(
     () => moment().subtract(3, "days").format("DD-MM-YYYY"),
     []
@@ -233,16 +234,15 @@ const GateIn = () => {
     let { name, value } = e.target;
 
     if (
-      name == "containerRemarks" ||
-      name == "otherRemarks" ||
-      e.target.type == "text"
+      name === "containerRemarks" ||
+      name === "otherRemarks" ||
+      e.target.type === "text"
     ) {
       value = value.toUpperCase();
     }
 
     let formattedValue = value;
 
-    // Format outTime to hh:mm if plain digits are typed
     if (name === "inTime") {
       const cleaned = value.replace(/\D/g, ""); // remove non-digits
       const limited = cleaned.slice(0, 4); // max 4 digits
@@ -252,6 +252,57 @@ const GateIn = () => {
       } else {
         formattedValue = `${limited.slice(0, 2)}:${limited.slice(2)}`;
       }
+
+      if (limited.length === 4) {
+        const inputTime = moment(formattedValue, "HH:mm");
+        const outTime = moment(formData.outTime, "HH:mm");
+
+        const gateInDateRaw = formData.inDate;
+        const gateOutDateRaw = previousPageData?.outDate;
+
+        const gateInDate = gateInDateRaw
+          ? moment(
+              gateInDateRaw,
+              ["DD-MM-YYYY", "DD/MM/YYYY", "DD.MM.YYYY"],
+              true
+            ).startOf("day")
+          : null;
+        const gateOutDate = gateOutDateRaw
+          ? moment(gateOutDateRaw).startOf("day")
+          : null;
+
+        if (
+          inputTime.isValid() &&
+          outTime.isValid() &&
+          gateInDate &&
+          gateOutDate
+        ) {
+          // Only validate time difference if dates are the same
+          if (gateInDate.isSame(gateOutDate, "day")) {
+            const diffInMinutes = inputTime.diff(outTime, "minutes");
+            if (diffInMinutes < 15) {
+              setErrors((prev) => ({
+                ...prev,
+                [name]:
+                  "Gate In Time must be at least 15 minutes after Gate Out Time when dates are the same",
+              }));
+            } else {
+              setErrors((prev) => ({ ...prev, [name]: "" }));
+            }
+          }
+          // No time validation needed if gateInDate is after gateOutDate
+          else if (gateInDate.isAfter(gateOutDate)) {
+            setErrors((prev) => ({ ...prev, [name]: "" }));
+          }
+          // Optional: Add validation if gateInDate is before gateOutDate
+          else if (gateInDate.isBefore(gateOutDate)) {
+            setErrors((prev) => ({
+              ...prev,
+              [name]: "Gate In Date cannot be before Gate Out Date",
+            }));
+          }
+        }
+      }
     }
 
     setFormData((prev) => ({
@@ -259,7 +310,7 @@ const GateIn = () => {
       [name]: formattedValue,
     }));
 
-    // Clear error when field is changed
+    // Clear unrelated error when typing
     if (errors[name]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -268,7 +319,7 @@ const GateIn = () => {
       });
     }
 
-    // Special handling for forwarder2 to check if it's same as forwarder1
+    // Forwarder validation
     if (name === "forwarder2" && formattedValue === formData.forwarder1) {
       setErrors((prev) => ({
         ...prev,
@@ -292,112 +343,155 @@ const GateIn = () => {
   console.log("previousPageData::", previousPageData);
 
   const validateForm = () => {
-    try {
-      const gateOutDateISO = moment(previousPageData?.outDate).startOf("day");
-      const gateInDate = moment(
-        formData.inDate,
-        ["DD-MM-YYYY", "DD/MM/YYYY", "DD.MM.YYYY"],
-        true
-      ).startOf("day");
+    const newErrors = {};
 
-      const validationData = {
-        ...formData,
-        gateOutDate: gateOutDateISO.isValid()
-          ? gateOutDateISO.format("DD-MM-YYYY")
-          : "",
-        inDate: gateInDate.isValid()
-          ? gateInDate.format("DD-MM-YYYY")
-          : formData.inDate,
-      };
+    // Required fields validation
+    if (!formData.yardName) newErrors.yardName = "Yard Name is required";
+    if (!formData.inDate) newErrors.inDate = "In Date is required";
+    if (!formData.inTime) newErrors.inTime = "In Time is required";
+    if (!formData.loadStatus) newErrors.loadStatus = "Load Status is required";
 
-      console.log("▶️ VALIDATING FORM");
-      console.log("➡️ inDate (Gate In):", validationData.inDate);
-      console.log("➡️ gateOutDate:", validationData.gateOutDate);
-
-      gateInSchema.parse(validationData);
-      setErrors({});
-      return true;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const newErrors = {};
-        error.errors.forEach((err) => {
-          newErrors[err.path[0]] = err.message;
-        });
-        setErrors(newErrors);
-      }
-      return false;
+    // Forwarder validation
+    if (
+      formData.forwarder1 &&
+      formData.forwarder2 &&
+      formData.forwarder1 === formData.forwarder2
+    ) {
+      newErrors.forwarder2 = "Forwarder 2 must be different from Forwarder 1";
     }
+
+    setErrors(newErrors);
+    // toast.error("Please fill the mandatory Fields");
+    return Object.keys(newErrors).length === 0;
   };
 
-  // const handleSave = async () => {
-  //   const formattedGateInDate = moment(formData.inDate, "DD-MM-YYYY").format(
-  //     "YYYY-MM-DD"
-  //   );
-
-  //   if (!validateForm()) {
-  //     toast.error("Please fix the validation errors before submitting");
-  //     return;
-  //   }
-
-  //   const payload = {
-  //     containerNumber: formData.containerNumber || "",
-  //     shipLine: formData.shippingLineId || "",
-  //     serviceCode: formData.serviceCode || "empty",
-  //     size: Number(formData.size),
-  //     containerStatus: formData.containerStatus || "",
-  //     forwarder1Id: Number(formData.forwarder1),
-  //     forwarder2Id: Number(formData.forwarder2),
-  //     transporter: Number(formData.transporter),
-  //     inDate: formattedGateInDate,
-  //     inTime: formData.inTime || "",
-  //     loadStatus: formData.loadStatus || "",
-  //     arrivalExportGetIn: formData.arrivalGateIn || "",
-  //     getInFrom: formData.gateInFrom || "",
-  //     referenceNumber: formData.refrenceNumber || "",
-  //     truckNumber: formData.truckNumber || "",
-  //     operation: "Get In",
-  //     custom: formData.custom || "",
-  //     other: formData.other || "",
-  //     otherSealDescription: formData.otherSealDiscription || "",
-  //     otherRemarks: formData.otherRemarks || "",
-  //     remarks: formData.containerRemarks || "",
-  //     yard: formData.yardName || "",
-  //   };
-
-  //   try {
-  //     const confirm = window.confirm(`Do you want to do the entry of Stuffing`);
-  //     const response = await operationService.gateIn(payload);
-  //     if (response.success) {
-  //       toast.success(
-  //         `YOU HAVE SUCCESSFULLY SAVED GATE-IN OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${response.data.getInContainerId}`
-  //       );
-  //       localStorage.setItem("operation", 10);
-  //       if (formData.loadStatus == "loaded") {
-  //         // by defaul factory stuffing ka data create krwa dena hai
-  //       }
-  //       navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
-  //     }
-  //     if (confirm) {
-  //       navigate(`${process.env.PUBLIC_URL}/app/factory-stuffing/${layoutURL}`);
-  //     } else {
-  //       navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
-  //     }
-  //   } catch (error) {
-  //     toast.error("Failed to create GateIn");
-  //   }
-  // };
-
   const handleSave = async () => {
-    // 1. Parse Gate In Date from formData (user input)
-    const gateInDate = moment(formData.inDate, "DD-MM-YYYY").startOf("day");
+    const mandatoryFields = {
+      yardName: "Yard Name",
+      inDate: "In Date",
+      inTime: "In Time",
+      loadStatus: "Load Status",
+      containerStatus: "Container Status",
+    };
 
-    // 2. Parse Gate Out Date from previous page data (ISO format)
-    const gateOutDate = moment(previousPageData?.outDate).startOf("day");
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (field) => !formData[field]
+    );
 
-    // 4. Final ISO-formatted date to send to backend (start of day)
-    const formattedGateInDate = gateInDate.toISOString(); // "2025-07-14T00:00:00.000Z"
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
 
-    // 6. Build payload
+      const newErrors = {};
+      emptyFields.forEach((field) => {
+        newErrors[field] = `${mandatoryFields[field]} is required`;
+      });
+      setErrors(newErrors);
+      return;
+    }
+
+    // Time format validation
+    const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!timeRegex.test(formData.inTime)) {
+      toast.error("In Time must be in HH:MM format");
+      setErrors((prev) => ({
+        ...prev,
+        inTime: "Enter In Time in HH:MM format",
+      }));
+      return;
+    }
+
+    const gateInTime = moment(formData.inTime, "HH:mm");
+    const gateOutTime = moment(formData.outTime, "HH:mm");
+    const gateInDate = moment(formData.inDate, "DD-MM-YYYY", true).startOf(
+      "day"
+    );
+    const gateOutDate = previousPageData?.outDate
+      ? moment(previousPageData.outDate).startOf("day")
+      : null;
+
+    if (
+      gateInTime.isValid() &&
+      gateOutTime.isValid() &&
+      gateInDate.isValid() &&
+      gateOutDate?.isValid()
+    ) {
+      if (gateInDate.isSame(gateOutDate, "day")) {
+        const diffMinutes = gateInTime.diff(gateOutTime, "minutes");
+        if (diffMinutes < 15) {
+          toast.error(
+            "Gate In Time must be at least 15 minutes after Gate Out Time"
+          );
+          setErrors((prev) => ({
+            ...prev,
+            inTime:
+              "Gate In Time must be at least 15 minutes after Gate Out Time when dates are the same",
+          }));
+          return;
+        }
+      } else if (gateInDate.isBefore(gateOutDate)) {
+        toast.error("Gate In Date cannot be before Gate Out Date");
+        setErrors((prev) => ({
+          ...prev,
+          inDate: "Gate In Date cannot be before Gate Out Date",
+        }));
+        return;
+      }
+    }
+
+    // Forwarder validation
+    if (
+      formData.forwarder1 &&
+      formData.forwarder2 &&
+      formData.forwarder1 === formData.forwarder2
+    ) {
+      toast.error("Forwarder 1 and Forwarder 2 must be different");
+      setErrors((prev) => ({
+        ...prev,
+        forwarder2: "Forwarder 1 and Forwarder 2 must be different",
+      }));
+      return;
+    }
+
+    // Date validation
+    const gateInDateRaw = formData.inDate;
+    const gateOutDateRaw = previousPageData?.outDate;
+
+    const gateIn = moment(gateInDateRaw, "DD-MM-YYYY", true);
+    const gateOut = gateOutDateRaw
+      ? moment(gateOutDateRaw).startOf("day")
+      : null;
+    const current = moment(currentDate, "DD-MM-YYYY");
+
+    if (!gateIn.isValid()) {
+      toast.error("Invalid date format for In Date (DD-MM-YYYY)");
+      setErrors((prev) => ({
+        ...prev,
+        inDate: "Invalid date format (DD-MM-YYYY)",
+      }));
+      return;
+    } else if (gateIn.isAfter(current)) {
+      toast.error("In Date cannot be in the future");
+      setErrors((prev) => ({
+        ...prev,
+        inDate: "In Date cannot be in the future",
+      }));
+      return;
+    } else if (gateOut && gateIn.isBefore(gateOut)) {
+      toast.error("In Date cannot be before previous Gate Out Date");
+      setErrors((prev) => ({
+        ...prev,
+        inDate: "In Date cannot be before Gate Out Date",
+      }));
+      return;
+    }
+
+    // All validations passed
+    const formattedInDate = gateIn.format("YYYY-MM-DD");
+    setIsLoading(true);
+
     const payload = {
       containerNumber: formData.containerNumber || "",
       shipLine: formData.shipLine || "",
@@ -407,12 +501,13 @@ const GateIn = () => {
       forwarder1Id: Number(formData.forwarder1),
       forwarder2Id: Number(formData.forwarder2),
       transporter: Number(formData.transporter),
-      inDate: moment(formattedGateInDate).format("YYYY-MM-DD"),
+      inDate: formattedInDate,
       inTime: formData.inTime || "",
       loadStatus: formData.loadStatus || "",
       arrivalExportGetIn: formData.arrivalGateIn || "",
       getInFrom: formData.gateInFrom || "",
       referenceNumber: formData.refrenceNumber || "",
+      bookingNo: formData.bookingNumber || "",
       truckNumber: formData.truckNumber || "",
       operation: "Get In",
       custom: formData.custom || "",
@@ -423,7 +518,6 @@ const GateIn = () => {
       yard: formData.yardName || "",
     };
 
-    // 7. Save logic
     try {
       const response = await operationService.gateIn(payload);
 
@@ -433,22 +527,29 @@ const GateIn = () => {
         );
         localStorage.setItem("operation", 10);
 
-        if (formData.loadStatus == "loaded") {
-          const confirm = window.confirm(
+        if (
+          formData.loadStatus === "loaded" &&
+          formData.gateInFrom === "Factory Stuffing"
+        ) {
+          const confirmStuffing = window.confirm(
             `Do you want to do the entry of Stuffing`
           );
-          if (confirm) {
+          if (confirmStuffing) {
             navigate(
-              `${process.env.PUBLIC_URL}/app/factory-stuffing/${containerNumber}/${layoutURL}`
+              `${process.env.PUBLIC_URL}/app/factory-stuffing/${formData.containerNumber}/${layoutURL}`
             );
           }
         } else {
           navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
         }
+      } else {
+        toast.error("Failed to save gate in operation");
       }
     } catch (error) {
-      console.error("Gate In Save Error:", error);
-      toast.error("Failed to create GateIn");
+      console.error("Error saving gate in:", error);
+      toast.error("An error occurred while saving gate in operation");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -488,6 +589,8 @@ const GateIn = () => {
     };
 
     const gateInDate = moment(value, formatMap[separator], true);
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
 
     const gateOutDateRaw = previousPageData?.outDate;
 
@@ -507,6 +610,11 @@ const GateIn = () => {
         ...prev,
         [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
       }));
+    } else if (gateInDate.isAfter(current)) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Out Date cannot be in the future",
+      }));
     } else if (
       gateOutDate &&
       gateOutDate.isValid() &&
@@ -515,6 +623,11 @@ const GateIn = () => {
       setErrors((prev) => ({
         ...prev,
         [name]: "Gate In Date cannot be before Gate Out Date",
+      }));
+    } else if (gateInDate.isBefore(minimum)) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Out Date cannot be more than 3 days in the past",
       }));
     } else {
       setErrors((prev) => ({
@@ -807,7 +920,10 @@ const GateIn = () => {
 
                 <Row className="mb-3">
                   <Col md="6">
-                    <Label className="mb-1">Container Status</Label>
+                    <Label className="mb-1">
+                      Container Status{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </Label>
                     <select
                       disabled
                       name="containerStatus"
@@ -963,7 +1079,9 @@ const GateIn = () => {
                     />
                   </Col>
                   <Col md="6">
-                    <label>Yard</label>
+                    <label>
+                      Yard <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="yardName"
                       className="form-select"
@@ -989,7 +1107,10 @@ const GateIn = () => {
                 <h5 className="mb-3 mt-4">Transport Detail</h5>
                 <Row className="mb-3">
                   <Col md="4">
-                    <label>Gate In Date</label>
+                    <label>
+                      Gate In Date{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="inDate"
                       type="text"
@@ -1005,7 +1126,10 @@ const GateIn = () => {
                     )}
                   </Col>
                   <Col md="4">
-                    <label>Gate In Time</label>
+                    <label>
+                      Gate In Time{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="inTime"
                       type="text"
@@ -1021,7 +1145,10 @@ const GateIn = () => {
                     )}
                   </Col>
                   <Col md="4">
-                    <label>Load Status</label>
+                    <label>
+                      Load Status{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="loadStatus"
                       className={`form-select ${
@@ -1057,7 +1184,10 @@ const GateIn = () => {
                     </select>
                   </Col>
                   <Col md="4">
-                    <label>Gate In From</label>
+                    <label>
+                      Gate In From{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       disabled={formData.arrivalGateIn ? false : true}
                       name="gateInFrom"
@@ -1074,6 +1204,13 @@ const GateIn = () => {
                       <option value={"Factory Destuffing"}>
                         Factory Destuffing
                       </option>
+                      <option value="MOVE TO OTHER ICD SITES">
+                        Move to Other ICD
+                      </option>
+                      <option value="MOVE TO OTHER YARD">
+                        Move to Other Yard
+                      </option>
+                      <option value="Dispatch to PORT">Dispatch to PORT</option>
                       <option value="bby">BBY</option>
                       <option value="mdpt">MDPT</option>
                       <option value="ppsp">PPSP</option>
@@ -1199,7 +1336,10 @@ const GateIn = () => {
                 <h5 className="mb-3 mt-4">Container Condition</h5>
                 <Row className="mb-3">
                   <Col md="4">
-                    <label>Container Condition</label>
+                    <label>
+                      Container Status{" "}
+                      <span className="large mb-1 text-danger">*</span>{" "}
+                    </label>
                     <select
                       name="containerStatus"
                       className="form-select"

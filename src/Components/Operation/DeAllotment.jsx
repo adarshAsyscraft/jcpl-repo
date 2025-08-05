@@ -27,7 +27,7 @@ const DeAllotment = () => {
 
   const [formData, setFormData] = useState({
     containerNumber,
-    shippingLine: "",
+    shippingLineId: "",
     size: "",
     type: "",
     tareWeight: "",
@@ -80,6 +80,55 @@ const DeAllotment = () => {
 
   const handleSave = async () => {
     addContainer.push(formData.containerNumber);
+
+    const mandatoryFields = {
+      deAllotmentDate: "De Allotment Date",
+      containerRemark: "Remarks",
+    };
+
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (fields) => !formData[fields]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+      return;
+    }
+
+    const inputDate = moment(formData.deAllotmentDate, "DD-MM-YYYY");
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!inputDate.isValid()) {
+      toast.error("Invalid De-Allotment Date");
+      setFormErrors((prev) => ({
+        ...prev,
+        deAllotmentDate: "Invalid date",
+      }));
+      return;
+    }
+
+    if (inputDate.isAfter(current)) {
+      toast.error("De-Allotment Date cannot be in Future");
+      setFormErrors((prev) => ({
+        ...prev,
+        deAllotmentDate: "Date cannot be in Future",
+      }));
+      return;
+    }
+
+    if (inputDate.isBefore(minimum)) {
+      toast.error("De-Allotment date cannot be more than 3 days in the past");
+      setFormErrors((prev) => ({
+        ...prev,
+        deAllotmentDate: "Date cannot be more than 3 days in the past",
+      }));
+      return;
+    }
+
     const payload = {
       containerNumbers: addContainer || [formData.containerNumber],
       de_allotment_date: formData.deAllotmentDate,
@@ -115,7 +164,7 @@ const DeAllotment = () => {
       setFormData((prev) => ({
         ...prev,
         containerNumber: fetchedContainer.container_number || "",
-        shippingLine: fetchedContainer.shipping_line_id || "",
+        shippingLineId: fetchedContainer.shipping_line_id || "",
         size: fetchedContainer.size || "",
         type: fetchedContainer.container_type || "",
         tareWeight: fetchedContainer.tare_weight || "",
@@ -128,7 +177,20 @@ const DeAllotment = () => {
   }, [fetchedContainer]);
 
   const handleDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -154,7 +216,7 @@ const DeAllotment = () => {
     } else if (!isValidFormat || !inputDate.isValid()) {
       setFormErrors((prev) => ({
         ...prev,
-        [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
+        [name]: "Invalid Date",
       }));
     } else if (inputDate.isAfter(current)) {
       setFormErrors((prev) => ({
@@ -197,7 +259,10 @@ const DeAllotment = () => {
               <h5 className="mb-3 mt-5">De Allotment Details</h5>
               <Row className="mb-3">
                 <Col md="6">
-                  <h6>De Allotment Date</h6>
+                  <label>
+                    De Allotment Date{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="deAllotmentDate"
                     type="text"
@@ -228,7 +293,9 @@ const DeAllotment = () => {
               </Row>
               <Row className="mb-3">
                 <Col md="6">
-                  <h6>Remarks</h6>
+                  <label>
+                    Remarks <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <textarea
                     name="containerRemark"
                     className="form-control"

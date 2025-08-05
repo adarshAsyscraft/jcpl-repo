@@ -40,6 +40,7 @@ const Operation = () => {
   const [allotmentType, setAllotmentType] = useState(null);
   const [isDestuffRequest, setIsDestuffRequest] = useState(false);
   const [arrivalLoadStatus, setArrivalLoadStatus] = useState({});
+  const lastOperation = localStorage.getItem("operation");
 
   const containerRegex = /^[A-Z]{4}\d{7}$/;
 
@@ -51,7 +52,7 @@ const Operation = () => {
             await operationService.allotmentStuffingDetailsByContainerNo(
               containerNumber
             );
-          console.log("allotmentType:", allotmentType, res.data);
+          console.log("allotmentType222:", res);
 
           if (res.success) {
             setAllotmentType(res.data.allotment_type);
@@ -59,14 +60,18 @@ const Operation = () => {
             setAllotmentType(null);
           }
         } catch (error) {
-          console.error("Error fetching allotment type:", error);
+          // console.error("Error fetching allotment type:", error);
           setAllotmentType(null);
         }
       } else {
         setAllotmentType(null); // reset if invalid
       }
     };
-    if (selectedOperation == "8" || selectedOperation == "6") {
+    if (
+      selectedOperation == "8" ||
+      selectedOperation == "6" ||
+      selectedOperation == "11"
+    ) {
       fetchAllotmentType();
     }
   }, [selectedOperation, containerNumber]);
@@ -77,8 +82,19 @@ const Operation = () => {
     const fetchArrivalLoadStatus = async () => {
       if (containerRegex.test(containerNumber)) {
         try {
-          const res = await operationService.arrivalContainer(containerNumber);
-          setArrivalLoadStatus(res?.data?.load_status || null);
+          if (lastOperation == "2") {
+            const res = await operationService.arrivalContainer(
+              containerNumber
+            );
+            console.log("Arrival Result::", res);
+            setArrivalLoadStatus(res?.data?.load_status || null);
+          } else if (lastOperation == "3") {
+            const res = await operationService.destuffFCLContainer(
+              containerNumber
+            );
+            console.log("FCL Response::", res);
+            // setArrivalLoadStatus(res?.data)
+          }
         } catch {
           setArrivalLoadStatus(null);
         }
@@ -188,17 +204,11 @@ const Operation = () => {
     });
 
   const handleGoClick = async () => {
-    // Check for Gate in
-    if (selectedOperation === "10") {
-      // const lastOp = Number(localStorage.getItem("operation"));
-      // if (lastOp !== 11) {
-      //   toast.error("Please first do the entry of Gate Out Container");
-      //   return;
-      // }
-      // if (arrivalLoadStatus === "empty") {
-      //   toast.error("Gate In is only allowed for loaded containers.");
-      //   return;
-      // }
+    if (allotmentType == "icd-stuffing") {
+      if (selectedOperation != "6" && selectedOperation != "9") {
+        toast.error("This container is not valid for this operation");
+        return;
+      }
     }
 
     //Check for Gate Out
@@ -265,6 +275,28 @@ const Operation = () => {
               2
             );
           }
+          // if (selectedOperation == "6") {
+          //   icdStuffing = await operationService.getICDStuffingDetails(
+          //     containerNumber
+          //   );
+          // }
+          // if (selectedOperation == "8") {
+          //   factoryStuffing = await operationService.getFactoryStuffingDetails(
+          //     containerNumber
+          //   );
+          // }
+          // if (selectedOperation == "19") {
+          //   allotmentStuffing =
+          //     await operationService.allotmentStuffingDetailsByContainerNo(
+          //       containerNumber
+          //     );
+          // }
+          // if (selectedOperation == "9") {
+          //   stuffingLcl = await operationService.getStuffingLCLProceedDetail(
+          //     containerNumber
+          //   );
+          //   console.log(stuffingLcl);
+          // }
 
           if (selectedOperation === "4") {
             destuffRequestLcl = await containerService.destuffRequestContainer(
@@ -280,13 +312,13 @@ const Operation = () => {
           }
           console.log("Payload::", res);
           if (selectedOperation === "1" && res?.payload?.id) {
-            toast.error("Already Created Container");
+            toast.error("Container already Exist for this Operation");
           } else if (
             selectedOperation === "2" &&
             arrivalRes?.payload?.success
           ) {
             setIsValidContainer(1);
-            toast.error("Arrival Already Created Container");
+            toast.error("Container already Exist for this Operation");
           } else if (
             selectedOperation === "5" &&
             destuffRequestLcl?.success &&
@@ -294,18 +326,33 @@ const Operation = () => {
           ) {
             setIsValidContainer(1);
             setIsDestuffRequest(true);
-            toast.error("Container already exist");
+            toast.error("Container already Exist for this Operation");
           } else if (
             selectedOperation === "4" &&
             destuffRequestLcl?.success &&
             destuffRequestLcl?.data?.type == 1
           ) {
             setIsValidContainer(1);
-            toast.error("Container already exist");
+            toast.error("Container already Exist for this Operation");
           } else if (selectedOperation === "3" && destuffRequestLcl?.success) {
             setIsValidContainer(1);
-            toast.error("Container already exist");
-          } else {
+            toast.error("Container already Exist for this Operation");
+          }
+          // else if (selectedOperation === "6" && icdStuffing?.success) {
+          //   setIsValidContainer(1);
+          //   toast.error("Container already Exist for this Operation");
+          // }
+          // else if (selectedOperation === "8" && factoryStuffing?.success) {
+          //   setIsValidContainer(1);
+          //   toast.error("Container already Exist for this Operation");
+          // } else if (selectedOperation === "9" && stuffingLcl?.success) {
+          //   setIsValidContainer(1);
+          //   toast.error("Container already Exist for this Operation");
+          // } else if (selectedOperation === "19" && allotmentStuffing?.success) {
+          //   setIsValidContainer(1);
+          //   toast.error("Container already Exist for this Operation");
+          // }
+          else {
             navigate(
               `${process.env.PUBLIC_URL}${routePath}/${response.payload.container_number}/${layoutURL}`,
               {
@@ -405,20 +452,28 @@ const Operation = () => {
             error?.response?.data?.message ||
             error?.response?.statusText ||
             "Something went wrong";
-          toast.error(message);
+          // toast.error(message);
           shouldNavigate = false;
         }
       }
 
       // Skip navigate if check failed
       if (shouldNavigate) {
-        if (selectedOperation == "6" && allotmentType != "ICD-STUFFING") {
+        if (
+          selectedOperation == "6" &&
+          lastOperation == "2" &&
+          arrivalLoadStatus != "empty"
+        ) {
           toast.error("This container is not valid for ICD Stuffing");
           return;
         }
 
-        if (selectedOperation === "8" && allotmentType !== "FACTORY-STUFFING") {
-          toast.error("This container is not valid for Factory Stuffing");
+        if (
+          selectedOperation === "8" &&
+          allotmentType == "factory-stuffing" &&
+          lastOperation != "10"
+        ) {
+          toast.error("First do the entry of Gate In Operation");
           return;
         }
 

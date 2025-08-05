@@ -28,6 +28,7 @@ const OnHireSurvey = () => {
   const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
   const [errors, setErrors] = useState({});
   const [images, setImages] = useState([]);
+  const [surveyClient, setSurveyClient] = useState([]);
 
   const selectedOperation = location.state?.operation || "1";
 
@@ -68,6 +69,7 @@ const OnHireSurvey = () => {
     operation: selectedOperation || "",
     forwarder1: "",
     forwarder2: "",
+    clientName: "",
     transportMode: "",
     yardName: "",
     pol: "",
@@ -134,8 +136,30 @@ const OnHireSurvey = () => {
     }
   };
 
+  const fetchSurveyClient = async () => {
+    const res = await operationService.getClientSurvey();
+    setSurveyClient(res.data);
+  };
+
+  useEffect(() => {
+    fetchSurveyClient();
+  }, []);
+
   const handleDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -184,9 +208,73 @@ const OnHireSurvey = () => {
   };
 
   const handleSave = async () => {
+    const mandatoryFields = {
+      clientName: "Survey Client",
+      inspectionDate: "Date of Inspection",
+      manufacturedBy: "Manufactured By",
+      nameOfIcd: "Name of ICD",
+      yardName: "Yard Name",
+      inspectedBy: "Inspected By",
+    };
+
+    if (formData.nameOfIcd === "other") {
+      mandatoryFields.customICD = "Custom Yard";
+    }
+    if (formData.yardName == "other") {
+      mandatoryFields.customYard = "Custom Yard";
+    }
+
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (field) => !formData[field]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+
+      const newErrors = {};
+      emptyFields.forEach((field) => {
+        newErrors[field] = `${mandatoryFields[field]} is required`;
+      });
+      setErrors(newErrors);
+
+      return;
+    }
+
+    const inputDate = moment(formData.inspectionDate, "DD-MM-YYYY");
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!inputDate.isValid()) {
+      toast.error("Invalid Date of Inspection");
+      setErrors((prev) => ({
+        ...prev,
+        inspectionDate: "Invalid Date",
+      }));
+      return;
+    }
+    if (inputDate.isAfter(current)) {
+      toast.error("Inspection Date Cannot be in Future");
+      setErrors((prev) => ({
+        ...prev,
+        inspectionDate: "Date cannot be in future",
+      }));
+      return;
+    }
+    if (inputDate.isBefore(minimum)) {
+      toast.error("Inspection Date cannot be more than 3 days in the past ");
+      setErrors((prev) => ({
+        ...prev,
+        inspectionDate: "Date cannot be more than 3 days in the past",
+      }));
+      return;
+    }
+
     const formDataToSend = new FormData();
 
-    const formattedDateOfInspection = moment(
+    const formattedinspectionDate = moment(
       formData.inspectionDate,
       "DD-MM-YYYY"
     ).format("YYYY-MM-DD");
@@ -207,7 +295,7 @@ const OnHireSurvey = () => {
     );
     formDataToSend.append(
       "date_of_inspection",
-      toNullIfEmpty(formattedDateOfInspection)
+      toNullIfEmpty(formattedinspectionDate)
     );
     formDataToSend.append(
       "name_of_icd",
@@ -221,6 +309,7 @@ const OnHireSurvey = () => {
         ? toNullIfEmpty(formData.customYard)
         : toNullIfEmpty(formData.yardName)
     );
+    formDataToSend.append("clientName", toNullIfEmpty(formData.clientName));
     formDataToSend.append("inspected_by", toNullIfEmpty(formData.inspectedBy));
     formDataToSend.append(
       "container_condition",
@@ -292,11 +381,38 @@ const OnHireSurvey = () => {
                 disabled={true}
               />
 
-              <div className="shadow-sm p-4 mt-4">
+              <h5 className="mb-3 mt-5">Survey Client</h5>
+              <Row className="mb-3">
+                <Col md="6">
+                  <Label className="mb-1 ">
+                    Survey Client{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </Label>
+                  <select
+                    name="clientName"
+                    id=""
+                    className="form-select"
+                    value={formData.clientName}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select Survey CLient</option>
+                    {surveyClient.map((client) => (
+                      <option value={client.clientName}>
+                        {client.clientName}
+                      </option>
+                    ))}
+                  </select>
+                </Col>
+              </Row>
+
+              <div className="shadow-sm p-2">
                 <h5 className="mb-3 mt-5">On Hire Survey Details</h5>
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Inspection Date</label>
+                    <label>
+                      Inspection Date{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="inspectionDate"
                       type="text"
@@ -314,7 +430,10 @@ const OnHireSurvey = () => {
                     )}
                   </Col>
                   <Col md="6">
-                    <label>Manufactured By</label>
+                    <label>
+                      Manufactured By{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="manufacturedBy"
                       type="text"
@@ -328,7 +447,10 @@ const OnHireSurvey = () => {
 
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Name Of ICD</label>
+                    <label>
+                      Name Of ICD{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="nameOfIcd"
                       className="form-select"
@@ -356,7 +478,10 @@ const OnHireSurvey = () => {
                   </Col>
 
                   <Col md="6">
-                    <label>Yard Name</label>
+                    <label>
+                      Yard Name{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="yardName"
                       className="form-select"
@@ -385,7 +510,10 @@ const OnHireSurvey = () => {
 
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Inspected By</label>
+                    <label>
+                      Inspected By{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="inspectedBy"
                       type="text"

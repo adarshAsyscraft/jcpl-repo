@@ -29,6 +29,7 @@ const GateOutContainer = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [disable, setDisable] = useState(false);
 
   // Memoized values
   const currentDate = useMemo(() => moment().format("DD-MM-YYYY"), []);
@@ -74,7 +75,21 @@ const GateOutContainer = () => {
     forwarder1: "",
     forwarder2: "",
     transportMode: "",
+
+    previousForwerder1: "",
+    previousForwerder2: "",
     yardName: "",
+    previousBN: "",
+    previousYard: "",
+    preaviouLoadStatus: "",
+    previousDate: "",
+    previousReference: "",
+    previousTruckNumber: "",
+    previousShipLine: "",
+    previousRemark: "",
+    previousStatus: "",
+    previousTransporter: "",
+
     pol: "",
     shippingLineSeal: "",
     otherRemarks: "",
@@ -91,6 +106,7 @@ const GateOutContainer = () => {
     refrenceNumber: "",
     transporter: "",
     destinationPlace: "",
+    gateInFrom: "",
     getOutFor: "",
     yard: "",
     icd: "",
@@ -98,7 +114,7 @@ const GateOutContainer = () => {
     bookingNumber: "",
     anyOtherRemarks: "",
     shippingLineSealNumber: "",
-    arrivalDate: "",
+    // arrivalDate: "",
     wagonNumber: "",
     entryId: "",
     trainTruckNumber: "",
@@ -143,6 +159,7 @@ const GateOutContainer = () => {
     try {
       if (lastOp == "2") {
         res = await operationService.arrivalContainer(containerNumber);
+
         setLastOperation("Arrival");
       } else if (lastOp == "3") {
         res = await operationService.destuffFCLContainer(containerNumber);
@@ -160,6 +177,7 @@ const GateOutContainer = () => {
           containerNumber
         );
         setLastOperation("Allotment Stuffing");
+        setDisable(true);
       } else if (lastOp == "20") {
         res = await operationService.getAllotmentER(containerNumber);
         setLastOperation("Allotment ER");
@@ -169,24 +187,34 @@ const GateOutContainer = () => {
       }
     } catch (error) {
       console.error("Error fetching arrival data:", error);
-      toast.error("Failed to load arrival data");
+      // toast.error("Failed to load arrival data");
     }
+
+    console.log("Response::", res);
   }, [containerNumber]);
+  // console.log("Last Operation ID::", lastOp);
+  // console.log("Last Operation Name::", lastOperation);
 
   useEffect(() => {
     getPreviousContainerDetails();
   }, [getPreviousContainerDetails]);
 
-  console.log("Arrival Data::", arrivalData);
-
   // Update form data when arrival data is available
   useEffect(() => {
+    console.log("arrivalData111::", formData.previousDate);
     if (arrivalData) {
       setFormData((prev) => ({
         ...prev,
         forwarder1: arrivalData.forwarder1_id || arrivalData.forwarder1Id,
         forwarder2: arrivalData.forwarder2_id || arrivalData.forwarder2Id || "",
-        yardName: arrivalData.yard_id || arrivalData.yardId || "",
+        previousForwerder1:
+          arrivalData.forwarder1_id || arrivalData.forwarder1Id,
+        previousForwerder2:
+          arrivalData.forwarder2_id || arrivalData.forwarder2Id || "",
+        yardName:
+          arrivalData.yard_id || arrivalData.yardId || arrivalData.yard || "",
+        previousYard:
+          arrivalData.yard_id || arrivalData.yardId || arrivalData.yard || "",
         containerCondition:
           arrivalData.container_condition ||
           arrivalData.containerCondition ||
@@ -195,20 +223,58 @@ const GateOutContainer = () => {
           arrivalData.container_status ||
           arrivalData.containerCondition ||
           arrivalData?.status ||
+          arrivalData?.containerStatus ||
+          "",
+        previousStatus:
+          arrivalData.container_status ||
+          arrivalData.containerCondition ||
+          arrivalData?.status ||
+          arrivalData?.containerStatus ||
           "",
         bookingNumber:
           arrivalData.booking_number ||
           arrivalData.bookingNumber ||
           arrivalData.booking_no ||
           "",
-        arrivalDate:
-          moment(arrivalData.arraival_date).format("DD-MM-YYYY") || "",
-        loadStatus: arrivalData.load_status || arrivalData.loadStatus || "",
+        previousBN:
+          arrivalData.booking_number ||
+          arrivalData.bookingNumber ||
+          arrivalData.booking_no ||
+          "",
+        // arrivalDate:
+        //   moment(arrivalData.arraival_date).format("DD-MM-YYYY") || "",
+        loadStatus:
+          arrivalData.load_status || arrivalData.loadStatus || "empty",
+        previousDate: arrivalData.allotment_date
+          ? moment(arrivalData.allotment_date, "YYYY-MM-DD").format(
+              "DD-MM-YYYY"
+            )
+          : arrivalData.arraival_date
+          ? moment(arrivalData.arraival_date, "YYYY-MM-DD").format("DD-MM-YYYY")
+          : arrivalData.destuffDate
+          ? moment(arrivalData.destuffDate, "YYYY-MM-DD").format("DD-MM-YYYY")
+          : "",
+
+        preaviouLoadStatus:
+          arrivalData.load_status || arrivalData.loadStatus || "",
         wagonNumber: arrivalData.wagon_number || "",
         entryId: arrivalData.id || arrivalData,
         trainTruckNumber: arrivalData.train_truck_number || "",
+        previousTruckNumber: arrivalData.train_truck_number || "",
+        inDate: arrivalData.inDate || "",
+        gateInFrom: arrivalData.getInFrom || "",
+        inTime: arrivalData.inTime || "",
         shippingLineSealNumber:
-          arrivalData.seal_no || arrivalData?.ship_line || "",
+          arrivalData.seal_no ||
+          arrivalData?.ship_line ||
+          arrivalData.shipLine ||
+          "",
+        previousShipLine:
+          arrivalData.seal_no ||
+          arrivalData?.ship_line ||
+          arrivalData.shipLine ||
+          "",
+
         anyOtherRemarks:
           arrivalData.other_remarks || arrivalData.anyOtherRemarks || "",
         lastUpdateDate: moment(arrivalData.updated_at).format("DD-MM-YYYY"),
@@ -223,17 +289,22 @@ const GateOutContainer = () => {
         custom: arrivalData.custom || "",
         transporter:
           arrivalData.transporter_id || arrivalData?.transporter || "",
+        previousTransporter:
+          arrivalData.transporter_id || arrivalData?.transporter || "",
         // custom: arrivalData.custom || "",
         other: arrivalData.other || "",
         otherSealDescription:
-          arrivalData.other_description || arrivalData.other_seal_desc || "",
+          arrivalData.other_description ||
+          arrivalData.other_seal_desc ||
+          arrivalData.otherSealDescription ||
+          "",
         otherRemarks:
           arrivalData.other_remarks || arrivalData.anyOtherRemarks || "",
         containerRemark: arrivalData.remarks || arrivalData.remark || "",
         container_status: arrivalData.container_status || "",
-        allotmentDate: moment(arrivalData.allotment_date).format("DD-MM-YYYY"),
+        // allotmentDate: moment(arrivalData.allotment_date).format("DD-MM-YYYY"),
         allotmentType: arrivalData.allotment_type,
-        remarks: arrivalData.remarks,
+        previousRemark: arrivalData.remarks || "",
         pdaAccount: arrivalData.pda_account,
         aggrementParty: arrivalData.agreement_party,
         shipper: arrivalData.shipper,
@@ -257,7 +328,7 @@ const GateOutContainer = () => {
       }));
     }
   }, [arrivalData]);
-  console.log("formData::", formData);
+  // console.log("formData::", formData);
 
   // Form validation
   const validateForm = () => {
@@ -348,15 +419,161 @@ const GateOutContainer = () => {
   };
 
   // Handle form submission
+  // const handleSave = async () => {
+  //   if (!validateForm()) {
+  //     Object.values(errors).forEach((error) => toast.error(error));
+  //     return;
+  //   }
+  //   const formattedGateOutDate = moment(formData.outDate, "DD-MM-YYYY").format(
+  //     "YYYY-MM-DD"
+  //   );
+
+  //   setIsLoading(true);
+
+  //   const payload = {
+  //     containerNumber: formData.containerNumber || "",
+  //     bookingNumber: formData.bookingNumber || "",
+  //     containerStatus: formData.containerStatus || "",
+  //     custom: formData.custom || "",
+  //     destinationPlace: formData.destinationPlace || "",
+  //     forwarder1Id: Number(formData.forwarder1) || "",
+  //     forwarder2Id: Number(formData.forwarder2) || "",
+  //     forwarder1Name:
+  //       forwarders.find((f) => f.id == formData.forwarder1)?.name || "",
+  //     forwarder2Name:
+  //       forwarders.find((f) => f.id == formData.forwarder2)?.name || "",
+  //     operation: "Get Out",
+  //     other: formData.other || "",
+  //     otherRemarks: formData.otherRemarks || "",
+  //     otherSealDescription: formData.otherSealDescription || "",
+  //     outDate: formattedGateOutDate,
+  //     outTime: formData.outTime || "",
+  //     place: formData.place || "Port A",
+  //     refrenceNumber: formData.refrenceNumber || "",
+  //     remarks: formData.containerRemark || "",
+  //     shipline: formData.shippingLineSealNumber || "",
+  //     shippingLineId: formData.shippingLineId || "",
+  //     transporter: Number(formData.transporter) || "",
+  //     truckNumber: formData.trainTruckNumber || "",
+  //     yardId: formData.yardName || "",
+  //     serviceCode: formData.serviceCode || "SC001",
+  //     loadStatus: formData.loadStatus || "",
+  //     outFor: formData.getOutFor || "",
+  //   };
+
+  //   // console.log("Payload::", payload);
+
+  //   try {
+  //     const response = await operationService.gateOut(payload);
+  //     if (response.success) {
+  //       toast.success(
+  //         `YOU HAVE SUCCESSFULLY SAVED GATE-OUT OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${response.data.containerId}`
+  //       );
+  //       localStorage.setItem("operation", 11);
+  //       navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
+  //     } else {
+  //       toast.error("Failed to save gate out operation");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error saving gate out:", error);
+  //     // toast.error("An error occurred while saving gate out operation");
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
   const handleSave = async () => {
-    if (!validateForm()) {
-      Object.values(errors).forEach((error) => toast.error(error));
-      return;
-    }
-    const formattedGateOutDate = moment(formData.outDate, "DD-MM-YYYY").format(
-      "YYYY-MM-DD"
+    // Define mandatory fields
+    const mandatoryFields = {
+      getOutFor: "Get Out For",
+      outDate: "Out Date",
+      outTime: "Out Time",
+      loadStatus: "Load Status",
+      containerStatus: "Container Status",
+    };
+
+    // Find empty fields
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (field) => !formData[field]
     );
 
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+
+      const newErrors = {};
+      emptyFields.forEach((field) => {
+        newErrors[field] = `${mandatoryFields[field]} is required`;
+      });
+      setErrors(newErrors);
+      return;
+    }
+
+    // Time format validation (HH:MM)
+    const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!timeRegex.test(formData.outTime)) {
+      toast.error("Out Time must be in HH:MM format");
+      setErrors((prev) => ({
+        ...prev,
+        outTime: "Enter Out Time in HH:MM format",
+      }));
+      return;
+    }
+
+    // Forwarder validation
+    if (
+      formData.forwarder1 &&
+      formData.forwarder2 &&
+      formData.forwarder1 === formData.forwarder2
+    ) {
+      toast.error("Forwarder 1 and Forwarder 2 must be different");
+      setErrors((prev) => ({
+        ...prev,
+        forwarder2: "Forwarder 1 and Forwarder 2 must be different",
+      }));
+      return;
+    }
+
+    // Date validation
+    const inputDate = moment(formData.outDate, "DD-MM-YYYY", true);
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+    const previous = moment(formData.previousDate, "DD-MM-YYYY");
+
+    if (!inputDate.isValid()) {
+      toast.error("Invalid date format for Out Date (DD-MM-YYYY)");
+      setErrors((prev) => ({
+        ...prev,
+        outDate: "Invalid date format (DD-MM-YYYY)",
+      }));
+      return;
+    } else if (inputDate.isAfter(current)) {
+      toast.error("Out Date cannot be in the future");
+      setErrors((prev) => ({
+        ...prev,
+        outDate: "Date cannot be in the future",
+      }));
+      return;
+    } else if (inputDate.isBefore(minimum)) {
+      toast.error("Out Date cannot be more than 3 days in the past");
+      setErrors((prev) => ({
+        ...prev,
+        outDate: "Date cannot be more than 3 days in the past",
+      }));
+      return;
+    } else if (inputDate.isBefore(previous)) {
+      toast.error(`Out Date cannot be before ${lastOperation} date`);
+      setErrors((prev) => ({
+        ...prev,
+        outDate: `Out Date cannot be before ${lastOperation} date`,
+      }));
+      return;
+    }
+
+    // If all validations pass
+    const formattedOutDate = inputDate.format("YYYY-MM-DD");
     setIsLoading(true);
 
     const payload = {
@@ -375,7 +592,7 @@ const GateOutContainer = () => {
       other: formData.other || "",
       otherRemarks: formData.otherRemarks || "",
       otherSealDescription: formData.otherSealDescription || "",
-      outDate: formattedGateOutDate,
+      outDate: formattedOutDate,
       outTime: formData.outTime || "",
       place: formData.place || "Port A",
       refrenceNumber: formData.refrenceNumber || "",
@@ -394,12 +611,12 @@ const GateOutContainer = () => {
       const response = await operationService.gateOut(payload);
       if (response.success) {
         toast.success(
-          `YOU HAVE SUCCESSFULLY SAVED GATE-OUT OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${response.data.containerId}`
+          `YOU HAVE SUCCESSFULLY SAVED GATE-OUT OPERATION FOR ${formData.containerNumber}. WHERE ENTRY ID IS ${response.data.containerId}`
         );
         localStorage.setItem("operation", 11);
         navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
       } else {
-        toast.error(response.message || "Failed to save gate out operation");
+        toast.error("Failed to save gate out operation");
       }
     } catch (error) {
       console.error("Error saving gate out:", error);
@@ -443,7 +660,9 @@ const GateOutContainer = () => {
     const inputDate = moment(value, formatMap[separator], true);
     const current = moment(currentDate, "DD-MM-YYYY");
     const minimum = moment(minAllowedDate, "DD-MM-YYYY");
-    const arrival = moment(formData.arrivalDate, "DD-MM-YYYY");
+    const arrival = moment(formData.previousDate, "DD-MM-YYYY");
+
+    // console.log("Last OP date::", formData.previousDate);
 
     if (!value) {
       setErrors((prev) => ({
@@ -468,7 +687,7 @@ const GateOutContainer = () => {
     } else if (inputDate.isBefore(arrival)) {
       setErrors((prev) => ({
         ...prev,
-        [name]: "Out Date cannot be before Arrival Date",
+        [name]: `Out Date cannot be before ${lastOperation} Date`,
       }));
     } else {
       setErrors((prev) => ({
@@ -477,6 +696,8 @@ const GateOutContainer = () => {
       }));
     }
   };
+  console.log("Previous Date::", formData.previousDate);
+  console.log("Last Updated Date::", formData.lastUpdateDate);
   console.log("Arrival Data::", arrivalData);
 
   return (
@@ -529,6 +750,19 @@ const GateOutContainer = () => {
                     />
                   </Col>
                 </Row>
+                <Row className="mb-3">
+                  <Col md="6">
+                    <Label className="mb-1">{lastOperation} Date</Label>
+                    <input
+                      disabled
+                      name="previousDate"
+                      type="text"
+                      className="form-control"
+                      value={formData.previousDate}
+                      readOnly
+                    />
+                  </Col>
+                </Row>
 
                 {/* Operation-specific fields */}
                 {lastOp == 19 ? (
@@ -536,24 +770,13 @@ const GateOutContainer = () => {
                     {/* Operation 19 - Allotment Stuffing Fields */}
                     <Row className="mb-3">
                       <Col md="6">
-                        <Label className="mb-1">Allotment Date</Label>
-                        <input
-                          disabled
-                          name="allotmentDate"
-                          type="text"
-                          className="form-control"
-                          value={formData.allotmentDate}
-                          readOnly
-                        />
-                      </Col>
-                      <Col md="6">
                         <Label className="mb-1">Allotment Type</Label>
                         <input
                           disabled
                           name="allotmentType"
                           type="text"
                           className="form-control"
-                          value={formData.allotmentType}
+                          value={(formData.allotmentType || "").toUpperCase()}
                           readOnly
                         />
                       </Col>
@@ -567,7 +790,7 @@ const GateOutContainer = () => {
                           name="pdaAccount"
                           type="text"
                           className="form-control"
-                          value={formData.pdaAccount}
+                          value={(formData.pdaAccount || "").toUpperCase()}
                           readOnly
                         />
                       </Col>
@@ -603,7 +826,7 @@ const GateOutContainer = () => {
                           name="cargoCategory"
                           type="text"
                           className="form-control"
-                          value={formData.cargoCategory}
+                          value={(formData.cargoCategory || "").toUpperCase()}
                           readOnly
                         />
                       </Col>
@@ -614,10 +837,10 @@ const GateOutContainer = () => {
                         <Label className="mb-1">Booking Number</Label>
                         <input
                           disabled
-                          name="bookingNumber"
+                          name="previousBN"
                           type="text"
                           className="form-control"
-                          value={formData.bookingNumber}
+                          value={formData.previousBN}
                           readOnly
                         />
                       </Col>
@@ -663,11 +886,11 @@ const GateOutContainer = () => {
                       <Col md="6">
                         <Label className="mb-1">Yard Name</Label>
                         <select
-                          name="yardName"
+                          name="previousYard"
                           disabled
                           readOnly
                           className="form-select"
-                          value={formData.yardName}
+                          value={formData.previousYard}
                         >
                           <option value="">Select Yard</option>
                           {yards.map((res) => (
@@ -712,9 +935,9 @@ const GateOutContainer = () => {
                         <Label className="mb-1">Load Status</Label>
                         <input
                           disabled
-                          name="loadStatus"
+                          name="preaviouLoadStatus"
                           className="form-control"
-                          value={formData.loadStatus}
+                          value={formData.preaviouLoadStatus}
                           readOnly
                         />
                       </Col>
@@ -734,11 +957,11 @@ const GateOutContainer = () => {
                       <Col md="6">
                         <Label className="mb-1">Yard Name</Label>
                         <select
-                          name="yardName"
+                          name="previousYard"
                           disabled
                           readOnly
                           className="form-select"
-                          value={formData.yardName}
+                          value={formData.previousYard}
                         >
                           <option value="">Select Yard</option>
                           {yards.map((res) => (
@@ -775,9 +998,9 @@ const GateOutContainer = () => {
                         <Label className="mb-1">Transporter</Label>
                         <input
                           disabled
-                          name="transporter"
+                          name="previousTransporter"
                           className="form-control"
-                          value={formData.transporter}
+                          value={formData.previousTransporter}
                           readOnly
                         />
                       </Col>
@@ -790,13 +1013,13 @@ const GateOutContainer = () => {
                           disabled
                           name="referenceNumber"
                           className="form-control"
-                          value={formData.referenceNumber}
+                          value={formData.refrenceNumber}
                           readOnly
                         />
                       </Col>
                     </Row>
                   </>
-                ) : (
+                ) : lastOp == 2 ? (
                   <>
                     {/* Default Fields for other operations */}
                     <Row className="mb-3">
@@ -804,11 +1027,12 @@ const GateOutContainer = () => {
                         <Label className="mb-1">Forwarder1 Code</Label>
                         <input
                           disabled
-                          name="forwarder1"
+                          name="previousForwerder1"
                           className="form-control"
                           value={
-                            forwarders.find((f) => f.id == formData.forwarder1)
-                              ?.name || ""
+                            forwarders.find(
+                              (f) => f.id == formData.previousForwerder1
+                            )?.name || ""
                           }
                           readOnly
                         />
@@ -817,11 +1041,12 @@ const GateOutContainer = () => {
                         <Label className="mb-1">Forwarder2 Code</Label>
                         <input
                           disabled
-                          name="forwarder2"
+                          name="previousForwerder2"
                           className="form-control"
                           value={
-                            forwarders.find((f) => f.id == formData.forwarder2)
-                              ?.name || ""
+                            forwarders.find(
+                              (f) => f.id == formData.previousForwerder2
+                            )?.name || ""
                           }
                           readOnly
                         />
@@ -833,9 +1058,9 @@ const GateOutContainer = () => {
                         <Label className="mb-1">Load Status</Label>
                         <input
                           disabled
-                          name="loadStatus"
+                          name="preaviouLoadStatus"
                           className="form-control"
-                          value={formData.loadStatus}
+                          value={formData.preaviouLoadStatus}
                           readOnly
                         />
                       </Col>
@@ -856,20 +1081,10 @@ const GateOutContainer = () => {
                         <Label className="mb-1">Train/Truck Number</Label>
                         <input
                           disabled
-                          name="trainTruckNumber"
+                          name="previousTruckNumber"
                           className="form-control"
                           readOnly
-                          value={formData.trainTruckNumber}
-                        />
-                      </Col>
-                      <Col md="6">
-                        <Label className="mb-1">{lastOperation} Date</Label>
-                        <input
-                          disabled
-                          name="arrivalDate"
-                          className="form-control"
-                          value={formData.arrivalDate}
-                          readOnly
+                          value={formData.previousTruckNumber}
                         />
                       </Col>
                     </Row>
@@ -879,9 +1094,9 @@ const GateOutContainer = () => {
                         <Label className="mb-1">Container Status</Label>
                         <input
                           disabled
-                          name="containerStatus"
+                          name="previousStatus"
                           className="form-control"
-                          value={formData.containerStatus}
+                          value={formData.previousStatus}
                           readOnly
                         />
                       </Col>
@@ -891,9 +1106,9 @@ const GateOutContainer = () => {
                         </Label>
                         <input
                           disabled
-                          name="shippingLineSealNumber"
+                          name="previousShipLine"
                           className="form-control"
-                          value={formData.shippingLineSealNumber}
+                          value={formData.previousShipLine}
                           readOnly
                         />
                       </Col>
@@ -912,10 +1127,262 @@ const GateOutContainer = () => {
                       </Col>
                     </Row>
                   </>
+                ) : lastOp == 10 ? (
+                  <>
+                    <Row className="mb-3">
+                      <Col md="6">
+                        <Label className="mb-1">Forwarder1 Code</Label>
+                        <select
+                          name="previousForwerder1"
+                          className={`form-select`}
+                          onChange={handleChange}
+                          value={formData.previousForwerder1}
+                          readOnly
+                          disabled
+                        >
+                          <option value="">Select Forwarder</option>
+                          {forwardersLoading ? (
+                            <option>Loading...</option>
+                          ) : (
+                            forwarders
+                              .filter((res) => res.category === "forwarder")
+                              .map((fwd) => (
+                                <option key={fwd.id} value={fwd.id}>
+                                  {fwd.name}
+                                </option>
+                              ))
+                          )}
+                        </select>
+                      </Col>
+                      <Col md="6">
+                        <Label className="mb-1">Forwarder2 Code</Label>
+                        <input
+                          disabled
+                          name="previousForwerder2"
+                          className="form-control"
+                          value={
+                            forwarders.find(
+                              (f) => f.id == formData.previousForwerder2
+                            )?.name || ""
+                          }
+                          readOnly
+                        />
+                      </Col>
+                    </Row>
+                    <Row className="mb-3">
+                      <Col md="6">
+                        <Label className="mb-1">Load Status</Label>
+                        <input
+                          disabled
+                          name="preaviouLoadStatus"
+                          className="form-control"
+                          value={formData.preaviouLoadStatus}
+                          readOnly
+                        />
+                      </Col>
+                      <Col md="6">
+                        <Label className="mb-1">Yard Name</Label>
+                        <select
+                          disabled
+                          name="previousYard"
+                          className="form-select"
+                          onChange={handleChange}
+                          value={formData.previousYard}
+                          readOnly
+                        >
+                          <option value="">Select Yard</option>
+                          {yardsLoading ? (
+                            <option>Loading...</option>
+                          ) : (
+                            yards.map((yard) => (
+                              <option key={yard.id} value={yard.id}>
+                                {yard.name}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </Col>
+                    </Row>
+                    <Row className="mb-3">
+                      <Col md="6">
+                        <Label className="mb-1">Gate In From</Label>
+                        <select
+                          disabled
+                          readOnly
+                          name="gateInFrom"
+                          className={`form-select ${
+                            errors.getOutFor ? "is-invalid" : ""
+                          }`}
+                          onChange={handleChange}
+                          value={formData.gateInFrom}
+                        >
+                          <option value="">Select Get Out For</option>
+                          <option value="MOVE TO OTHER ICD SITES">
+                            Move to Other ICD
+                          </option>
+                          <option value="MOVE TO OTHER YARD">
+                            Move to Other Yard
+                          </option>
+                          <option value="Factory Stuffing">
+                            Factory Stuffing
+                          </option>
+                          <option value="Factory Destuffing">
+                            Factory Destuffing
+                          </option>
+                        </select>
+                      </Col>
+                    </Row>
+                    <Row className="mb-3">
+                      <Col md="6">
+                        <Label className="mb-1">In Time</Label>
+                        <input
+                          disabled
+                          name="inTime"
+                          className="form-control"
+                          value={formData.inTime}
+                          readOnly
+                        />
+                      </Col>
+                      <Col md="6">
+                        <Label className="mb-1">ShipLine</Label>
+                        <input
+                          disabled
+                          name="previousShipLine"
+                          className="form-control"
+                          value={formData.previousShipLine}
+                          readOnly
+                        />
+                      </Col>
+                    </Row>
+                    <Row className="mb-3">
+                      <Col md="6">
+                        <Label className="mb-1">Transporter</Label>
+                        <input
+                          disabled
+                          name="previousTransporter"
+                          className="form-control"
+                          value={formData.previousTransporter}
+                          readOnly
+                        />
+                      </Col>
+                      <Col md="6">
+                        <Label className="mb-1">Truck Number</Label>
+                        <input
+                          disabled
+                          name="previousTruckNumber"
+                          className="form-control"
+                          value={formData.previousTruckNumber}
+                          readOnly
+                        />
+                      </Col>
+                    </Row>
+                  </>
+                ) : (
+                  (lastOp == 3 || lastOp == 4) && (
+                    <>
+                      <Row className="mb-3">
+                        <Col md="6">
+                          <Label className="mb-1">Forwarder1 Code</Label>
+                          <select
+                            name="previousForwerder1"
+                            className={`form-select`}
+                            onChange={handleChange}
+                            value={formData.previousForwerder1}
+                            readOnly
+                            disabled
+                          >
+                            <option value="">Select Forwarder</option>
+                            {forwardersLoading ? (
+                              <option>Loading...</option>
+                            ) : (
+                              forwarders
+                                .filter((res) => res.category === "forwarder")
+                                .map((fwd) => (
+                                  <option key={fwd.id} value={fwd.id}>
+                                    {fwd.name}
+                                  </option>
+                                ))
+                            )}
+                          </select>
+                        </Col>
+                        <Col md="6">
+                          <Label className="mb-1">Forwarder2 Code</Label>
+                          <input
+                            disabled
+                            name="previousForwerder2"
+                            className="form-control"
+                            value={
+                              forwarders.find(
+                                (f) => f.id == formData.previousForwerder2
+                              )?.name || ""
+                            }
+                            readOnly
+                          />
+                        </Col>
+                      </Row>
+                      <Row className="mb-3">
+                        <Col md="6">
+                          <Label className="mb-1">Yard Name</Label>
+                          <select
+                            disabled
+                            name="previousYard"
+                            className="form-select"
+                            onChange={handleChange}
+                            value={formData.previousYard}
+                            readOnly
+                          >
+                            <option value="">Select Yard</option>
+                            {yardsLoading ? (
+                              <option>Loading...</option>
+                            ) : (
+                              yards.map((yard) => (
+                                <option key={yard.id} value={yard.id}>
+                                  {yard.name}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                        </Col>
+                        <Col md="6">
+                          <Label className="mb-1">Booking Number</Label>
+                          <input
+                            disabled
+                            name="previousBN"
+                            type="text"
+                            className="form-control"
+                            value={formData.previousBN}
+                            readOnly
+                          />
+                        </Col>
+                      </Row>
+                      <Row className="mb-3">
+                        <Col md="6">
+                          <Label className="mb-1">Container Status</Label>
+                          <input
+                            disabled
+                            name="previousStatus"
+                            className="form-control"
+                            value={formData.previousStatus}
+                            readOnly
+                          />
+                        </Col>
+                      </Row>
+                    </>
+                  )
                 )}
 
                 {/* Common fields for all operations */}
                 <Row className="mb-3">
+                  <Col md="6">
+                    <Label className="mb-1">Remark</Label>
+                    <input
+                      disabled
+                      name="previousRemark"
+                      className="form-control"
+                      value={formData.previousRemark}
+                      readOnly
+                    />
+                  </Col>
                   <Col md="6">
                     <Label className="mb-1">Last Update Date</Label>
                     <input
@@ -927,6 +1394,8 @@ const GateOutContainer = () => {
                       readOnly
                     />
                   </Col>
+                </Row>
+                <Row className="mb-3">
                   <Col md="6">
                     <Label className="mb-1">Last Update Time</Label>
                     <input
@@ -1048,8 +1517,12 @@ const GateOutContainer = () => {
                     />
                   </Col>
                   <Col md="6">
-                    <Label className="large mb-1">Yard Name</Label>
+                    <Label className="large mb-1">
+                      Yard Name{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </Label>
                     <select
+                      disabled={lastOp == "19"}
                       name="yardName"
                       className="form-select"
                       onChange={handleChange}
@@ -1075,7 +1548,10 @@ const GateOutContainer = () => {
                 <h5 className="mb-3 mt-4">Transport Detail</h5>
                 <Row className="mb-3">
                   <Col md="4">
-                    <Label className="large mb-1">Get Out For*</Label>
+                    <Label className="large mb-1">
+                      Gate Out For
+                      <span className="large mb-1 text-danger"> *</span>
+                    </Label>
                     <select
                       name="getOutFor"
                       className={`form-select ${
@@ -1083,6 +1559,7 @@ const GateOutContainer = () => {
                       }`}
                       onChange={handleChange}
                       value={formData.getOutFor}
+                      disabled={disable}
                     >
                       <option value="">Select Get Out For</option>
                       <option value="MOVE TO OTHER ICD SITES">
@@ -1189,14 +1666,16 @@ const GateOutContainer = () => {
 
                 <Row className="mb-3">
                   <Col md="4">
-                    <Label className="large mb-1">Load Status</Label>
+                    <Label className="large mb-1">
+                      Load Status{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </Label>
                     <select
+                      disabled
                       name="loadStatus"
                       className="form-select"
                       onChange={handleChange}
-                      value={
-                        formData.loadStatus ? formData.loadStatus : "empty"
-                      }
+                      value={formData.loadStatus}
                     >
                       <option value="">Load Status</option>
                       <option value="empty">Empty</option>
@@ -1227,7 +1706,9 @@ const GateOutContainer = () => {
                 </Row>
                 <Row className="mb-3">
                   <Col md="4">
-                    <Label className="large mb-1">Out Date*</Label>
+                    <Label className="large mb-1">
+                      Out Date<span className="large mb-1 text-danger"> *</span>
+                    </Label>
                     <input
                       name="outDate"
                       type="text"
@@ -1245,7 +1726,9 @@ const GateOutContainer = () => {
                     )}
                   </Col>
                   <Col md="4">
-                    <Label className="large mb-1">Out Time*</Label>
+                    <Label className="large mb-1">
+                      Out Time<span className="large mb-1 text-danger"> *</span>
+                    </Label>
                     <input
                       name="outTime"
                       type="text" // changed from "time"
@@ -1321,7 +1804,10 @@ const GateOutContainer = () => {
                 <h5 className="mb-3 mt-4">Container Condition</h5>
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Container Status</label>
+                    <label>
+                      Container Status
+                      <span className="large mb-1 text-danger"> *</span>
+                    </label>
                     <select
                       name="containerStatus"
                       className="form-select"

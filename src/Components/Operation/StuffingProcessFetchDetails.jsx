@@ -67,7 +67,7 @@ function StuffingProcessFetchDetails({
     shipline: "",
     custom: "",
     other: "",
-    remarks:
+    containerRemarks:
       "1. CONTAINER STUFFED IN SOUND CONDITION. 2. CARGO DETAILS/WEIGHT AS DECLARED IN THE SHIPPING BILL/INVOICE, ALL PACKAGES STUFFED ARE INSPECTED TO EXTERNAL CONDITION ONLY.",
     anyOtherRemarks: "",
   });
@@ -165,7 +165,7 @@ function StuffingProcessFetchDetails({
           otherSealRemarks: hasAllotment
             ? allotment.other_seal_desc
             : stuffing?.other_seal_desc,
-          remarks: hasAllotment ? allotment.remark : stuffing?.remark,
+          // containerRemarks: hasAllotment ? allotment.remark : stuffing?.remark,
         }));
       }
     } catch (error) {
@@ -223,7 +223,20 @@ function StuffingProcessFetchDetails({
   };
 
   const handleDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -273,6 +286,71 @@ function StuffingProcessFetchDetails({
 
   const handleSubmit = async () => {
     try {
+      const mandatoryFields = {
+        stuffingDate: "Stuffing Date",
+        cargoCategory: "Cargo Category",
+        yardId: "Yard Name",
+        pdaAccount: "PDA Account",
+        vgmByShipper: "VGM By Shipper",
+      };
+
+      if (formData.cargoCategory === "hazardous") {
+        mandatoryFields.imoNumber = "IMO Number";
+        mandatoryFields.unNumber = "UN Number";
+      } else if (formData.cargoCategory === "refer") {
+        mandatoryFields.temperature = "Temperature";
+      } else if (formData.cargoCategory === "both") {
+        mandatoryFields.imoNumber = "IMO Number";
+        mandatoryFields.unNumber = "UN Number";
+        mandatoryFields.temperature = "Temperature";
+      }
+
+      const emptyFields = Object.keys(mandatoryFields).filter(
+        (field) => !formData[field]
+      );
+
+      if (emptyFields.length > 0) {
+        const missingFieldsList = emptyFields
+          .map((field) => mandatoryFields[field])
+          .join(", ");
+        toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+
+        const newErrors = {};
+        emptyFields.forEach((field) => {
+          newErrors[field] = `${mandatoryFields[field]} is required`;
+        });
+        setErrors(newErrors);
+
+        return;
+      }
+
+      const inputDate = moment(formData.stuffingDate, "DD-MM-YYYY", true);
+      const current = moment(currentDate, "DD-MM-YYYY");
+      const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+      if (!inputDate.isValid()) {
+        toast.error("Invalid date format for Stuffing Date");
+        setErrors((prev) => ({
+          ...prev,
+          stuffingDate: "Invalid date format (DD-MM-YYYY)",
+        }));
+        return;
+      } else if (inputDate.isAfter(current)) {
+        toast.error("Stuffing Date cannot be in the future");
+        setErrors((prev) => ({
+          ...prev,
+          stuffingDate: "Date cannot be in the future",
+        }));
+        return;
+      } else if (inputDate.isBefore(minimum)) {
+        toast.error("Stuffing Date cannot be more than 3 days in the past");
+        setErrors((prev) => ({
+          ...prev,
+          stuffingDate: "Date cannot be more than 3 days in the past",
+        }));
+        return;
+      }
+
       const payload = {
         container_id: fetchedContainer.id,
         shippingLine: formData.shippingLine || null,
@@ -299,7 +377,7 @@ function StuffingProcessFetchDetails({
         shipline: formData.shipline || null,
         custom: formData.custom || null,
         other: formData.other || null,
-        remarks: formData.remarks || null,
+        remarks: formData.containerRemarks || null,
         anyOtherRemarks: formData.anyOtherRemarks || null,
       };
       const res = await operationService.stuffingProceed(payload);
@@ -530,7 +608,10 @@ function StuffingProcessFetchDetails({
                   <h5 className="mb-3">Stuffing Details</h5>
                   <Row className="mb-3">
                     <Col md="6">
-                      <Label>Stuffing Date</Label>
+                      <Label>
+                        Stuffing Date{" "}
+                        <span className="large mb-1 text-danger">*</span>
+                      </Label>
                       <input
                         type="text"
                         name="stuffingDate"
@@ -546,7 +627,10 @@ function StuffingProcessFetchDetails({
                       )}
                     </Col>
                     <Col md="6">
-                      <label htmlFor="">Cargo Category</label>
+                      <label htmlFor="">
+                        Cargo Category{" "}
+                        <span className="large mb-1 text-danger">*</span>
+                      </label>
                       <select
                         name="cargoCategory"
                         className={`form-select ${
@@ -573,7 +657,10 @@ function StuffingProcessFetchDetails({
                     formData.cargoCategory === "both") && (
                     <Row className="mb-3">
                       <Col md="6">
-                        <label>IMO Number</label>
+                        <label>
+                          IMO Number{" "}
+                          <span className="large mb-1 text-danger">*</span>
+                        </label>
                         <input
                           name="imoNumber"
                           type="text"
@@ -583,7 +670,10 @@ function StuffingProcessFetchDetails({
                         />
                       </Col>
                       <Col md="6">
-                        <label>UN Number</label>
+                        <label>
+                          UN Number{" "}
+                          <span className="large mb-1 text-danger">*</span>
+                        </label>
                         <input
                           name="unNumber"
                           type="text"
@@ -599,7 +689,10 @@ function StuffingProcessFetchDetails({
                     formData.cargoCategory === "both") && (
                     <Row className="mb-3">
                       <Col md="6">
-                        <label>Temperature</label>
+                        <label>
+                          Temperature{" "}
+                          <span className="large mb-1 text-danger">*</span>
+                        </label>
                         <input
                           name="temperature"
                           type="text"
@@ -623,7 +716,10 @@ function StuffingProcessFetchDetails({
                       />
                     </Col>
                     <Col md="6">
-                      <label>Yard Name</label>
+                      <label>
+                        Yard Name{" "}
+                        <span className="large mb-1 text-danger">*</span>
+                      </label>
                       <select
                         name="yardId"
                         onChange={handleChange}
@@ -670,7 +766,10 @@ function StuffingProcessFetchDetails({
 
                   <Row className="mb-3">
                     <Col md="6">
-                      <label>PDA Account</label>
+                      <label>
+                        PDA Account{" "}
+                        <span className="large mb-1 text-danger">*</span>
+                      </label>
                       <select
                         name="pdaAccount"
                         className="form-select"
@@ -679,7 +778,7 @@ function StuffingProcessFetchDetails({
                       >
                         <option value="">Select PDA</option>
                         <option value="shipper pda">Shipper PDA</option>
-                        <option value="linear pda">Linear PDA</option>
+                        <option value="liner pda">Liner PDA</option>
                       </select>
                     </Col>
                     <Col md="6">
@@ -719,7 +818,10 @@ function StuffingProcessFetchDetails({
 
                   <Row className="mb-3">
                     <Col md="6">
-                      <Label>VGM By Shipper</Label>
+                      <Label>
+                        VGM By Shipper{" "}
+                        <span className="large mb-1 text-danger">*</span>
+                      </Label>
                       <input
                         type="text"
                         className="form-control"
@@ -796,11 +898,11 @@ function StuffingProcessFetchDetails({
                 <Col md="6">
                   <label className="form-label">Remarks</label>
                   <textarea
-                    name="remarks"
+                    name="containerRemarks"
                     className="form-control"
                     rows="3"
                     onChange={handleChange}
-                    value={formData.remarks}
+                    value={formData.containerRemarks}
                   />
                 </Col>
                 <Col md="6">

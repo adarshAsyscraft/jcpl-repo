@@ -27,6 +27,10 @@ const FactoryStuffing = () => {
   const [allotmentData, setAllotmentData] = useState({}); // New state for allotment data
   const [vgm, setVGM] = useState(0);
   const [vgmDiff, setVgmDiff] = useState(0);
+  const [errors, setErrors] = useState({});
+  const [cargoErrors, setCargoErrors] = useState([]); // for cargoDetails date errors
+  const currentDate = moment().format("DD-MM-YYYY");
+  const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
 
   // Redux selectors
   const { fetchedContainer } = useSelector((state) => state.container);
@@ -108,6 +112,21 @@ const FactoryStuffing = () => {
     remarks: "",
   };
 
+  const fieldDisplayNames = {
+    shipBillNumber: "Shipping Bill No.",
+    shipBillDate: "Shipping Bill Date",
+    shipperName: "Shipper Name",
+    consigneeName: "Consignee Name",
+    cargo: "Cargo",
+    "cargoWeight (in kg)": "Cargo Weight (kg)",
+    cbm: "CBM",
+    packedIn: "Packed In",
+    packages: "Packages",
+    marks: "Marks",
+    number: "Number",
+    remarks: "Remarks",
+  };
+
   // State management
   const [formData, setFormData] = useState(initialFormData);
   const [cargoDetails, setCargoDetails] = useState([]);
@@ -136,36 +155,18 @@ const FactoryStuffing = () => {
     }));
   }, [cargoDetails]);
 
-  // Fetch data on component mount
   useEffect(() => {
-    const containerNumber = location.state?.containerNumber || "";
-    if (containerNumber) {
-      dispatch(fetchContainerByNumber(containerNumber));
-    }
-    dispatch(fetchForwarders());
-    dispatch(fetchYards());
-  }, [dispatch, location.state]);
+    const loadData = async () => {
+      const containerNumber = location.state?.containerNumber || "";
+      if (containerNumber) {
+        await dispatch(fetchContainerByNumber(containerNumber));
+      }
+      await dispatch(fetchForwarders());
+      await dispatch(fetchYards());
+    };
 
-  // Update form data when container data is available
-  useEffect(() => {
-    if (location.state || fetchedContainer?.container_number) {
-      const source = fetchedContainer;
-      setFormData((prev) => ({
-        ...prev,
-        containerNumber:
-          source.container_number || source.containerNumber || "",
-        shippingLineId: source.shipping_line_id || source.shippingLineId || "",
-        size: source.size || "",
-        type: source.container_type || source.type || "",
-        tareWeight: source.tare_weight || source.tareWeight || "",
-        mgWeight: source.mg_weight || source.mgWeight || "",
-        mfdDate: source.mfd_date || source.mfdDate || "",
-        cscValidity: source.csc_validity || source.cscValidity || "",
-        remarks: source.remarks || "",
-        operation: source.operation || "",
-      }));
-    }
-  }, [location.state, fetchedContainer]);
+    loadData();
+  }, [dispatch, location.state]);
 
   // Recalculate totals when cargo details change
   useEffect(() => {
@@ -177,14 +178,23 @@ const FactoryStuffing = () => {
     let { name, value } = e.target;
 
     if (name === "vgmByShipper") {
-      const updatedVgmByShipper =
-        name === "vgmByShipper"
-          ? parseFloat(value)
-          : parseFloat(formData.vgmByShipper || 0);
+      // Use the value the user just typed
+      const vgmByShipper = parseFloat(value || 0);
+      const calculatedVgm = parseFloat(vgm || 0);
+      const vgmDifference = calculatedVgm - vgmByShipper;
 
-      // Check VGM difference logic
-      const difference = Number(vgm - updatedVgmByShipper);
-      setVgmDiff(difference);
+      // Allow ±1000 difference
+      if (value && (vgmDifference < -1000 || vgmDifference > 1000)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "VGM is incorrect",
+        }));
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "",
+        }));
+      }
     }
 
     if (
@@ -198,10 +208,113 @@ const FactoryStuffing = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleDateInput = (value) => {
+    // Remove all non-digit characters
+    let digits = value.replace(/\D/g, "");
+
+    // Auto-format as user types
+    if (digits.length > 0) {
+      digits = digits.slice(0, 8); // Limit to 8 digits (DDMMYYYY)
+
+      // Apply formatting
+      if (digits.length <= 2) {
+        return digits; // DD
+      } else if (digits.length <= 4) {
+        return `${digits.slice(0, 2)}-${digits.slice(2)}`; // DD-MM
+      } else {
+        return `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(
+          4,
+          8
+        )}`; // DD-MM-YYYY
+      }
+    }
+    return "";
+  };
+
+  // const handleDetailChange = (index, field, value, isContainer = false) => {
+  //   const setter = isContainer ? setContainerDetails : setCargoDetails;
+
+  //   let processedValue = value;
+
+  //   if (field === "shipBillDate") {
+  //     // Get current value from state instead of 'form'
+  //     const currentDetails = isContainer ? containerDetails : cargoDetails;
+  //     const currentValue = currentDetails[index][field];
+
+  //     // Handle backspace/delete
+  //     if (value.length < currentValue.length) {
+  //       processedValue = value; // Allow backspace
+  //     } else {
+  //       processedValue = handleDateInput(value); // Auto-format new input
+  //     }
+  //   } else if (getInputType(field) === "text") {
+  //     processedValue = value.toUpperCase();
+  //   }
+
+  //   setter((prev) =>
+  //     prev.map((item, i) =>
+  //       i === index ? { ...item, [field]: processedValue } : item
+  //     )
+  //   );
+  // };
+
   const handleDetailChange = (index, field, value, isContainer = false) => {
     const setter = isContainer ? setContainerDetails : setCargoDetails;
+    const errorSetter = isContainer ? () => {} : setCargoErrors; // only cargo for now
+
+    let processedValue = value;
+
+    if (field === "shipBillDate") {
+      const currentDetails = isContainer ? containerDetails : cargoDetails;
+      const currentValue = currentDetails[index][field];
+
+      // Handle backspace/delete
+      if (value.length < currentValue.length) {
+        processedValue = value;
+      } else {
+        processedValue = handleDateInput(value);
+      }
+
+      // Validation logic
+      if (processedValue.length === 10) {
+        const datePattern = /^(\d{2})([-/.])(\d{2})\2(\d{4})$/;
+        const match = processedValue.match(datePattern);
+
+        errorSetter((prev) => {
+          const safePrev = Array.isArray(prev) ? prev : [];
+          const newErrors = [...safePrev];
+          newErrors[index] = { ...newErrors[index] };
+
+          if (!match) {
+            newErrors[index].shipBillDate = "Date must be in DD-MM-YYYY format";
+          } else {
+            const [, day, separator, month, year] = match;
+            const dateStr = `${day}${separator}${month}${separator}${year}`;
+            const dateMoment = moment(
+              dateStr,
+              `DD${separator}MM${separator}YYYY`,
+              true
+            );
+
+            if (!dateMoment.isValid()) {
+              newErrors[index].shipBillDate = "Invalid date";
+            } else if (dateMoment.isAfter(moment())) {
+              newErrors[index].shipBillDate = "Date cannot be in the future";
+            } else {
+              newErrors[index].shipBillDate = undefined;
+            }
+          }
+          return newErrors;
+        });
+      }
+    } else if (getInputType(field) === "text") {
+      processedValue = value.toUpperCase();
+    }
+
     setter((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+      prev.map((item, i) =>
+        i === index ? { ...item, [field]: processedValue } : item
+      )
     );
   };
 
@@ -257,114 +370,343 @@ const FactoryStuffing = () => {
     { cargoWeight: 0, packages: 0 }
   );
 
-  const getPreviousData = async () => {
-    const containerNumber = fetchedContainer?.container_number;
-    if (!containerNumber) return;
-    let allotmentRes;
-    let gateInRes;
+  const validateDateFormat = (dateString) => {
+    // Regular expression for DD-MM-YYYY format
+    const dateRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[012])-(19|20)\d\d$/;
 
+    if (!dateRegex.test(dateString)) {
+      return false;
+    }
+
+    // Additional validation for actual calendar dates
+    const parts = dateString.split("-");
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+
+    const date = new Date(year, month - 1, day);
+    return (
+      date.getDate() === day &&
+      date.getMonth() === month - 1 &&
+      date.getFullYear() === year
+    );
+  };
+
+  const getPreviousData = async () => {
     try {
-      let lastOp = localStorage.getItem("operation");
-      // 1. First fetch allotment data (for cargo details)
-      if (lastOp == "19") {
-        allotmentRes =
+      const containerNumber = fetchedContainer?.container_number;
+      if (!containerNumber) {
+        console.log("No container number available yet");
+        return;
+      }
+
+      // Fetch gate-in data first (required)
+      const gateInRes = await operationService.getInDataFechByContainerNumber(
+        containerNumber
+      );
+
+      if (!gateInRes?.success) {
+        toast.error(
+          `Failed to fetch gate-in data: ${
+            gateInRes?.message || "Unknown error"
+          }`
+        );
+        return;
+      }
+
+      const gateInData = gateInRes.data || gateInRes;
+      setPreviousPageData(gateInData);
+
+      // Initialize form with gate-in data
+      const updatedFormData = {
+        ...formData,
+
+        //fetchedContainer
+        containerNumber: fetchedContainer?.container_number || "",
+        shippingLineId: fetchedContainer?.shipping_line_id || "",
+        size: fetchedContainer?.size || "",
+        type: fetchedContainer?.container_type || "",
+        tareWeight: fetchedContainer?.tare_weight || "",
+        mgWeight: fetchedContainer?.mg_weight || "",
+        mfdDate: fetchedContainer?.mfd_date || "",
+        cscValidity: fetchedContainer?.csc_validity || "",
+        remarks: fetchedContainer?.remarks || "",
+
+        //preiousePageData
+        forwarder1: gateInData.forwarder1Id || gateInData.forwarder1 || "",
+        forwarder2: gateInData.forwarder2Id || gateInData.forwarder2 || "",
+        stuffingDate: gateInData.inDate
+          ? moment(gateInData.inDate).format("DD-MM-YYYY")
+          : "",
+        shipline: gateInData.ship_line || gateInData.shipLine || "",
+        yardName: gateInData.yard_id || gateInData.yard || "",
+        custom: gateInData.custom || "",
+        bookingNumber: gateInData.bookingNo || "",
+        excise: gateInData.excise || "",
+        other: gateInData.other || "",
+        otherSealRemarks:
+          gateInData.other_seal_desc || gateInData.otherSealDescription || "",
+      };
+
+      // Try to fetch allotment data (optional)
+      try {
+        const allotmentRes =
           await operationService.allotmentStuffingDetailsByContainerNo(
             containerNumber
           );
-        if (!allotmentRes.success) {
-          toast.error("Failed to fetch allotment stuffing data");
-          return;
-        }
-        setAllotmentData(allotmentRes);
-        console.log("AllotmentRes::", allotmentRes);
-      }
 
-      // 2. Then fetch gate-in data (for seal details and other fields)
-      else if (lastOp == "10") {
-        gateInRes = await operationService.getInDataFechByContainerNumber(
-          containerNumber
+        if (allotmentRes?.success && allotmentRes.data) {
+          const allotment = allotmentRes.data;
+          setAllotmentData(allotmentRes);
+
+          // Update form with allotment data if available
+          Object.assign(updatedFormData, {
+            cargoCategory: allotment.cargo_category || "",
+            bookingNumber: allotment.booking_no || "",
+            pol: allotment.pol || "",
+            dischargePortName:
+              allotment.discharge_port || allotment.discharge_port_name || "",
+            fpd: allotment.fpd || "",
+            pdaAccount: allotment.pda_account || "",
+            aggrementParty:
+              allotment.aggrement_party || allotment.agreement_party || "",
+            vgmByShipper: allotment.vgm_by_shipper || "",
+            vesselViaNumber:
+              allotment.vessel_via_number || allotment.vessel_via_no || "",
+            placeOfHandOver: allotment.place_of_handover || "",
+            hsCode: allotment.hs_code || "",
+          });
+
+          // Set cargo details only if allotment exists
+          setCargoDetails([
+            {
+              shipBillNumber: allotment.shipp_bill_no || "",
+              shipBillDate: allotment.s_bill_date
+                ? moment(allotment.s_bill_date).format("DD-MM-YYYY")
+                : "",
+              shipperName: allotment.shipper || "",
+              consigneeName: allotment.consignee_name || "",
+              cargo: allotment.cargo || "",
+              "cargoWeight (in kg)": allotment.cargo_wt_kgs || "0.000",
+              cbm: allotment.cbm || "0.000",
+              packedIn: allotment.packed_in || "",
+              packages: allotment.packages || "0",
+              marks: allotment.marks || "",
+              number: allotment.number || "",
+              // remarks: allotment.remark || "",
+              id: Date.now(),
+              slNo: 1,
+            },
+          ]);
+        }
+      } catch (allotmentError) {
+        console.log(
+          "No allotment data found, proceeding with gate-in data only"
         );
-        if (!gateInRes.success) {
-          toast.error("Failed to fetch gate-in data");
-          return;
-        }
-        setPreviousPageData(gateInRes.data);
       }
-      // 3. Set cargo details from allotment data
-      const cargoDetail = {
-        shipBillNumber: allotmentData.data.shipp_bill_no || "",
-        shipBillDate:
-          moment(allotmentData.data.s_bill_date).format("DD-MM-YYYY") || "",
-        shipperName: allotmentData.data.shipper || "",
-        consigneeName: allotmentData.data.consignee_name || "",
-        cargo: allotmentData.data.cargo || "",
-        "cargoWeight (in kg)": allotmentData.data.cargo_wt_kgs || "0.000",
-        cbm: allotmentData.data.cbm || "0.000",
-        packedIn: allotmentData.data.packed_in || "",
-        packages: allotmentData.data.packages || "0",
-        marks: allotmentData.data.marks || "",
-        number: allotmentData.data.number || "",
-        remarks: allotmentData.data.remark || "",
-        id: Date.now(),
-        slNo: 1,
-      };
-      setCargoDetails([cargoDetail]);
 
-      // 4. Set form data combining sources
-      setFormData((prev) => ({
-        ...prev,
-        // From allotment data
-
-        cargoCategory: allotmentData.data.cargo_category,
-        imoNumber: allotmentData.data.imo_number,
-        unNumber: allotmentData.data.un_number,
-        temperature: allotmentData.data.temperature,
-        bookingNumber: allotmentData.data.booking_no,
-        pol: allotmentData.data.pol,
-        dischargePortName: allotmentData.data.discharge_port_name,
-        fpd: allotmentData.data.fpd,
-        pdaAccount: allotmentData.data.pda_account,
-        aggrementParty: allotmentData.data.agreement_party,
-        vesselViaNumber: allotmentData.data.vessel_via_no,
-        placeOfHandOver: allotmentData.data.place_of_handover,
-
-        excise: previousPageData.data.excise,
-        other: previousPageData.data.other,
-        otherSealRemarks:
-          previousPageData.data.other_seal_desc ||
-          previousPageData.data.otherSealDescription,
-
-        // From gate-in data (seal details)
-        forwarder1: previousPageData.data.forwarder1Id,
-        forwarder2: previousPageData.data.forwarder2Id,
-        stuffingDate: moment(previousPageData.data?.inDate).format(
-          "DD-MM-YYYY"
-        ),
-        shipline:
-          previousPageData.data.ship_line || previousPageData.data.shipLine,
-        yardName: previousPageData.data.yard_id || previousPageData.data.yard,
-        custom: previousPageData.data.custom,
-      }));
+      setFormData(updatedFormData);
     } catch (error) {
-      console.error("Error fetching previous data:", error);
-      toast.error("Failed to fetch previous operation data");
+      console.error("Error in getPreviousData:", error);
+      toast.error(`Failed to fetch previous operation data: ${error.message}`);
     }
   };
 
   useEffect(() => {
-    getPreviousData();
-  }, []);
+    if (fetchedContainer?.container_number) {
+      getPreviousData();
+    }
+  }, [fetchedContainer]);
+
+  const handleDateChange = (e) => {
+    let { name, value } = e.target;
+
+    // Remove all non-digit characters
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert separators as user types
+    if (value.length > 4) {
+      value = `${value.slice(0, 2)}-${value.slice(2, 4)}-${value.slice(4)}`;
+    } else if (value.length > 2) {
+      value = `${value.slice(0, 2)}-${value.slice(2)}`;
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Validate only when we have a complete date (DD-MM-YYYY)
+    if (value.length === 10) {
+      const datePattern = /^(\d{2})([-/.])(\d{2})\2(\d{4})$/;
+      const match = value.match(datePattern);
+
+      if (!match) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date must be in DD-MM-YYYY format",
+        }));
+        return;
+      }
+
+      const [, day, separator, month, year] = match;
+      const dateStr = `${day}${separator}${month}${separator}${year}`;
+      const dateMoment = moment(
+        dateStr,
+        `DD${separator}MM${separator}YYYY`,
+        true
+      );
+
+      if (!dateMoment.isValid()) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Invalid date",
+        }));
+        return;
+      }
+
+      const current = moment();
+      const minDate = moment().subtract(3, "days");
+
+      if (dateMoment.isAfter(current)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be in the future",
+        }));
+      } else if (dateMoment.isBefore(minDate)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be more than 3 days in the past",
+        }));
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: undefined,
+        }));
+      }
+    } else if (value.length > 0) {
+      // Show error if partially entered but not complete
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "Please enter a complete date in DD-MM-YYYY format",
+      }));
+    } else {
+      // Clear error if empty
+      setErrors((prev) => ({
+        ...prev,
+        [name]: undefined,
+      }));
+    }
+  };
 
   const handleSubmit = async () => {
     try {
+      const mandatoryFields = {
+        stuffingDate: "Stuffing Date",
+        cargoCategory: "Cargo Category",
+        yardName: "Yard Name",
+        vgmByShipper: "VGM By Shipper",
+      };
+
+      if (formData.cargoCategory === "hazardous") {
+        mandatoryFields.imoNumber = "IMO Number";
+        mandatoryFields.unNumber = "UN Number";
+      } else if (formData.cargoCategory === "refer") {
+        mandatoryFields.temperature = "Temperature";
+      } else if (formData.cargoCategory === "both") {
+        mandatoryFields.imoNumber = "IMO Number";
+        mandatoryFields.unNumber = "UN Number";
+        mandatoryFields.temperature = "Temperature";
+      }
+
+      const emptyFields = Object.keys(mandatoryFields).filter(
+        (fields) => !formData[fields]
+      );
+
+      if (emptyFields.length > 0) {
+        const missingFieldsList = emptyFields
+          .map((field) => mandatoryFields[field])
+          .join(", ");
+        toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+        return;
+      }
+
+      // Forwarder validation
+      if (
+        formData.forwarder1 &&
+        formData.forwarder2 &&
+        formData.forwarder1 === formData.forwarder2
+      ) {
+        toast.error("Forwarder 1 and Forwarder 2 must be different");
+        setErrors((prev) => ({
+          ...prev,
+          forwarder2: "Forwarder 1 and Forwarder 2 must be different",
+          forwarder1: "Forwarder 1 and Forwarder 2 must be different",
+        }));
+        return;
+      }
+
+      const inputDate = moment(formData.stuffingDate, "DD-MM-YYYY", true);
+      const current = moment(currentDate, "DD-MM-YYYY");
+      const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+      if (!inputDate.isValid()) {
+        toast.error("Invalid date format for Stuffing Date");
+        setErrors((prev) => ({
+          ...prev,
+          stuffingDate: "Invalid date format (DD-MM-YYYY)",
+        }));
+        return;
+      } else if (inputDate.isAfter(current)) {
+        toast.error("Stuffing Date cannot be in the future");
+        setErrors((prev) => ({
+          ...prev,
+          stuffingDate: "Date cannot be in the future",
+        }));
+        return;
+      } else if (inputDate.isBefore(minimum)) {
+        toast.error("Stuffing Date cannot be more than 3 days in the past");
+        setErrors((prev) => ({
+          ...prev,
+          stuffingDate: "Date cannot be more than 3 days in the past",
+        }));
+        return;
+      }
+
+      //Ship bill date validation
+      for (let i = 0; i < cargoDetails.length; i++) {
+        const dateValue = cargoDetails[i]?.shipBillDate?.trim() || "";
+
+        if (dateValue) {
+          const datePattern = /^(\d{2})([-/.])(\d{2})\2(\d{4})$/;
+          const match = dateValue.match(datePattern);
+
+          if (!match) {
+            toast.error(`Form ${i + 1}: Date must be in DD-MM-YYYY format`);
+            return;
+          }
+
+          const [, day, separator, month, year] = match;
+          const dateStr = `${day}${separator}${month}${separator}${year}`;
+          const dateMoment = moment(
+            dateStr,
+            `DD${separator}MM${separator}YYYY`,
+            true
+          );
+
+          if (!dateMoment.isValid()) {
+            toast.error(`Form ${i + 1}: Invalid date`);
+            return;
+          }
+
+          if (dateMoment.isAfter(moment())) {
+            toast.error(`Form ${i + 1}: Date cannot be in the future`);
+            return;
+          }
+        }
+      }
+
       const newErrors = {};
-
-      // if (vgmDiff >= -1000 && vgmDiff <= 1000) {
-      //   toast.success("Shi Hai");
-      // } else {
-      //   toast.error("Please Check VGM weight");
-      // }
-
       // Calculate VGM difference
       const vgmByShipper = parseFloat(formData.vgmByShipper || 0);
       const calculatedVgm = parseFloat(vgm || 0);
@@ -376,13 +718,7 @@ const FactoryStuffing = () => {
         (vgmDifference < -1000 || vgmDifference > 1000)
       ) {
         const shouldProceed = window.confirm(
-          `VGM difference is ${vgmDifference.toFixed(
-            2
-          )} kgs (Calculated VGM: ${calculatedVgm.toFixed(
-            2
-          )} kgs, Shipper VGM: ${vgmByShipper.toFixed(
-            2
-          )} kgs). Do you want to proceed with this entry?`
+          `VGM difference is ${vgmDifference} kgs (Calculated VGM: ${calculatedVgm} kgs, Shipper VGM: ${vgmByShipper} kgs). Do you want to proceed with this entry?`
         );
 
         if (!shouldProceed) {
@@ -530,14 +866,24 @@ const FactoryStuffing = () => {
 
               <Row className="mb-3">
                 <Col md="6">
-                  <label>Stuffing Date</label>
+                  <label>
+                    Stuffing Date{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="stuffingDate"
                     type="text"
-                    className="form-control"
-                    onChange={handleChange}
+                    className={`form-control ${
+                      errors.stuffingDate ? "is-invalid" : ""
+                    }`}
+                    onChange={handleDateChange}
                     value={formData.stuffingDate}
                   />
+                  {errors.stuffingDate && (
+                    <div className="invalid-feedback">
+                      {errors.stuffingDate}
+                    </div>
+                  )}
                 </Col>
                 {/*  */}
                 {/* <Col md="6">
@@ -552,7 +898,10 @@ const FactoryStuffing = () => {
                 </Col> */}
                 {/*  */}
                 <Col md="6">
-                  <label>Cargo Category</label>
+                  <label>
+                    Cargo Category{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
                     name="cargoCategory"
                     className="form-select"
@@ -572,7 +921,10 @@ const FactoryStuffing = () => {
                 formData.cargoCategory == "both") && (
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>IMO Number</label>
+                    <label>
+                      IMO Number{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="imoNumber"
                       type="text"
@@ -582,7 +934,10 @@ const FactoryStuffing = () => {
                     />
                   </Col>
                   <Col md="6">
-                    <label>UN Number</label>
+                    <label>
+                      UN Number{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="unNumber"
                       type="text"
@@ -598,7 +953,10 @@ const FactoryStuffing = () => {
                 formData.cargoCategory == "both") && (
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Temperature</label>
+                    <label>
+                      Temperature{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="temperature"
                       type="text"
@@ -623,8 +981,11 @@ const FactoryStuffing = () => {
                 </Col>
 
                 <Col md="6">
-                  <label>Yard Name</label>
+                  <label>
+                    Yard Name <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
+                    disabled
                     name="yardName"
                     className="form-select"
                     onChange={handleChange}
@@ -686,7 +1047,7 @@ const FactoryStuffing = () => {
                   >
                     <option value="">Select PDA</option>
                     <option value="shipper pda">Shipper PDA</option>
-                    <option value="linear pda">Linear PDA</option>
+                    <option value="liner pda">Liner PDA</option>
                   </select>
                 </Col>
               </Row>
@@ -703,14 +1064,24 @@ const FactoryStuffing = () => {
                   />
                 </Col>
                 <Col md="6">
-                  <label>VGM By Shipper</label>
+                  <label>
+                    VGM By Shipper{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="vgmByShipper"
                     type="text"
-                    className="form-control"
+                    className={`form-control ${
+                      errors.vgmByShipper ? "is-invalid" : ""
+                    }`}
                     onChange={handleChange}
                     value={formData.vgmByShipper}
                   />
+                  {errors.vgmByShipper && (
+                    <div className="invalid-feedback">
+                      {errors.vgmByShipper}
+                    </div>
+                  )}
                 </Col>
               </Row>
 
@@ -749,27 +1120,38 @@ const FactoryStuffing = () => {
                 </Col>
               </Row>
 
-              <div className="mb-3">
-                <button
-                  className="btn btn-primary w-25"
-                  onClick={() => addDetailForm(false)}
-                >
-                  Proceed to enter Cargo Detail
-                </button>
+              <div className="shadow-sm p-4  mt-4">
+                <div className="mb-3 d-flex justify-content-between align-items-center">
+                  <button
+                    className="btn btn-primary w-25"
+                    onClick={() => addDetailForm(false)}
+                  >
+                    Proceed to enter Cargo Detail
+                  </button>
+                  <span className="badge bg-info fs-6">
+                    Forms Open: {cargoDetails.length}
+                  </span>
+                </div>
 
                 {cargoDetails.map((form, index) => (
                   <div key={form.id} className="mt-4 p-4 border rounded">
-                    <h3 className="font-semibold mb-2">
-                      Cargo Detail - SL No: {form.slNo}
-                    </h3>
                     <Row>
-                      {Object.entries(form).map(
-                        ([field, value]) =>
+                      {Object.entries(form).map(([field, value]) => {
+                        const isDateField = field === "shipBillDate";
+                        const isValidDate = isDateField
+                          ? validateDateFormat(value)
+                          : true;
+
+                        return (
                           !["slNo", "id"].includes(field) && (
                             <Col md="4" key={field} className="mb-2">
-                              <label className="form-label">{field}</label>
+                              <label className="form-label">
+                                {fieldDisplayNames[field]}
+                              </label>
                               <input
-                                type={getInputType(field)}
+                                type={
+                                  isDateField ? "text" : getInputType(field)
+                                }
                                 value={value}
                                 onChange={(e) =>
                                   handleDetailChange(
@@ -778,11 +1160,31 @@ const FactoryStuffing = () => {
                                     e.target.value
                                   )
                                 }
-                                className="form-control"
+                                className={`form-control ${
+                                  isDateField &&
+                                  cargoErrors[index]?.shipBillDate
+                                    ? "is-invalid"
+                                    : ""
+                                }`}
+                                style={{
+                                  textTransform:
+                                    getInputType(field) === "text"
+                                      ? "uppercase"
+                                      : "none",
+                                }}
+                                placeholder={isDateField ? "DD-MM-YYYY" : ""}
+                                maxLength={isDateField ? 10 : undefined}
                               />
+                              {isDateField &&
+                                cargoErrors[index]?.shipBillDate && (
+                                  <div className="invalid-feedback">
+                                    {cargoErrors[index].shipBillDate}
+                                  </div>
+                                )}
                             </Col>
                           )
-                      )}
+                        );
+                      })}
                     </Row>
                     <div className="d-flex justify-content-end col-12">
                       <button

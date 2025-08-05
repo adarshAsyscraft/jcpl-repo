@@ -199,7 +199,7 @@ const ContainerDetailsSection = ({
         </Col>
 
         <Col md="6">
-          <Label className="large mb-1">ACEP</Label>
+          <Label className="large mb-1">CSC Validity</Label>
           {/* <DatePicker
             id="acepDate"
             className="form-control"
@@ -212,7 +212,7 @@ const ContainerDetailsSection = ({
           /> */}
 
           <Input
-            name="mfdDate"
+            name="cscValidity"
             type="text"
             placeholder="MM-YYYY"
             className="form-control"

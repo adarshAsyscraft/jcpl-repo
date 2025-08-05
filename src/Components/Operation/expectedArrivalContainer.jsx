@@ -15,6 +15,7 @@ import {
 } from "../../Redux/slices/containerSlice";
 import { fetchTransporters } from "../../Redux/slices/transporterSlice";
 import ContainerDetailsSection from "./containerDetails";
+import moment from "moment";
 import { Select } from "antd";
 const { Option } = Select;
 
@@ -34,6 +35,8 @@ const ExpectedArrivalContainer = () => {
   const { fetchedContainer } = useSelector((state) => state.container);
 
   const selectedOperation = location.state?.operation || "1";
+  const currentDate = moment().format("DD-MM-YYYY");
+  const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
 
   useEffect(() => {
     dispatch(fetchContainerByNumber(containerNumber));
@@ -69,6 +72,7 @@ const ExpectedArrivalContainer = () => {
     forwarder2: "",
     transportMode: "",
     yardName: "",
+    expectedDate: "",
     pol: "",
     shippingLineSeal: "",
     containerRemarks: "",
@@ -108,9 +112,8 @@ const ExpectedArrivalContainer = () => {
     if (!data.yardName) {
       newErrors.yardName = "Yard Name is required";
     }
-
-    if (data.transportMode === "road" && !data.transporter) {
-      newErrors.transporter = "Transporter is required for Road transport";
+    if (!data.expectedDate) {
+      newErrors.expectedDate = "Expected Received Date is required";
     }
 
     if (
@@ -165,15 +168,195 @@ const ExpectedArrivalContainer = () => {
     });
   };
 
-  const handleSave = async () => {
-    const validationErrors = validateForm(formData);
+  const handleDateChange = (e) => {
+    let { name, value } = e.target;
 
-    if (Object.keys(validationErrors).length > 0) {
-      setFormErrors(validationErrors);
-      toast.error("Please correct the errors in the form");
+    // Remove all non-digit characters first
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
+
+    // Update input value
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Only validate when input is fully typed in DD-MM-YYYY format
+    if (value.length === 10) {
+      const inputDate = moment(value, "DD-MM-YYYY", true);
+      const current = moment(currentDate, "DD-MM-YYYY");
+      const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+      if (!inputDate.isValid()) {
+        setFormErrors((prev) => ({
+          ...prev,
+          [name]: "Invalid date format (DD-MM-YYYY)",
+        }));
+      } else if (inputDate.isAfter(current)) {
+        setFormErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be in the future",
+        }));
+      } else if (inputDate.isBefore(minimum)) {
+        setFormErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be more than 3 days in the past",
+        }));
+      } else {
+        setFormErrors((prev) => ({ ...prev, [name]: undefined }));
+      }
+    } else {
+      // Don't show error while typing incomplete date
+      setFormErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
+  };
+
+  // const handleSave = async () => {
+  //   const validationErrors = validateForm(formData);
+
+  //   if (Object.keys(validationErrors).length > 0) {
+  //     setFormErrors(validationErrors);
+  //     toast.error("Please correct the errors in the form");
+  //     return;
+  //   }
+
+  //   try {
+  //     const payload = {
+  //       size: formData.size || null,
+  //       type: formData.type || null,
+  //       tareWeight: formData.tareWeight || null,
+  //       mfdDate: formData.mfdDate || null,
+  //       mgWeight: formData.mgWeight || null,
+  //       cscValidity: formData.cscValidity || null,
+  //       forwarder1: formData.forwarder1 || null,
+  //       forwarder2: formData.forwarder2 || null,
+  //       containerNumber: formData.containerNumber,
+  //       transportMode: formData.transportMode || null,
+  //       loadStatus: formData.loadStatus || null,
+  //       transporter_id: formData.transporter || null,
+  //       wagon_no: formData.wagonNumber || null,
+  //       yardName: formData.yardName || null,
+  //       train_truck_no: formData.train_truck_no || null,
+  //       pol: formData.pol || null,
+  //       shippingLineId: formData.shippingLineId || null,
+  //       expectedReceiveDate:
+  //         moment(formData.expectedDate, "DD-MM-YYYY").format("YYYY-MM-DD") ||
+  //         null,
+  //       shippingLineSeal: formData.shippingLineSeal || null,
+  //       remarks: formData.containerRemarks || null,
+  //       operation: "1",
+  //     };
+
+  //     console.log("Payload::", payload);
+
+  //     const response = await dispatch(
+  //       createExpectedContainer(payload)
+  //     ).unwrap();
+
+  //     if (
+  //       response?.data?.message === "Expected container created successfully"
+  //     ) {
+  //       toast.success(
+  //         `YOU HAVE SUCCESSFULLY SAVED EXPECTED ARRIVAL OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${response.data.data.id}`
+  //       );
+  //       navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
+  //     } else {
+  //       toast.error("Something went wrong!");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error while creating container:", error);
+  //     toast.error("Failed to create container!");
+  //   }
+  // };
+
+  const handleSave = async () => {
+    // List of mandatory fields with their display names
+    const mandatoryFields = {
+      transportMode: "Transport Mode",
+      loadStatus: "Load Status",
+      yardName: "Yard Name",
+      expectedDate: "Expected Received Date",
+    };
+
+    // Check which mandatory fields are empty
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (field) => !formData[field]
+    );
+
+    // If there are empty mandatory fields
+    if (emptyFields.length > 0) {
+      // Create a user-friendly message listing the missing fields
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS : ${missingFieldsList}`);
+
+      // Highlight the empty fields by setting errors
+      const newErrors = {};
+      emptyFields.forEach((field) => {
+        newErrors[field] = `${mandatoryFields[field]} is required`;
+      });
+      setFormErrors(newErrors);
+
+      return; // Don't proceed with save operation
+    }
+
+    // Check for forwarder validation
+    if (
+      formData.forwarder1 &&
+      formData.forwarder2 &&
+      formData.forwarder1 === formData.forwarder2
+    ) {
+      toast.error("Forwarder 1 and Forwarder 2 must be different");
+      setFormErrors((prev) => ({
+        ...prev,
+        forwarder2: "Forwarder 1 and Forwarder 2 must be different",
+      }));
       return;
     }
 
+    // Date validation
+    if (formData.expectedDate) {
+      const inputDate = moment(formData.expectedDate, "DD-MM-YYYY", true);
+      const current = moment(currentDate, "DD-MM-YYYY");
+      const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+      if (!inputDate.isValid()) {
+        toast.error(
+          "Invalid date format for Expected Received Date (DD-MM-YYYY)"
+        );
+        setFormErrors((prev) => ({
+          ...prev,
+          expectedDate: "Invalid date format (DD-MM-YYYY)",
+        }));
+        return;
+      } else if (inputDate.isAfter(current)) {
+        toast.error("Expected Received Date cannot be in the future");
+        setFormErrors((prev) => ({
+          ...prev,
+          expectedDate: "Date cannot be in the future",
+        }));
+        return;
+      } else if (inputDate.isBefore(minimum)) {
+        toast.error(
+          "Expected Received Date cannot be more than 3 days in the past"
+        );
+        setFormErrors((prev) => ({
+          ...prev,
+          expectedDate: "Date cannot be more than 3 days in the past",
+        }));
+        return;
+      }
+    }
+
+    // If all validations pass, proceed with save
     try {
       const payload = {
         size: formData.size || null,
@@ -193,10 +376,15 @@ const ExpectedArrivalContainer = () => {
         train_truck_no: formData.train_truck_no || null,
         pol: formData.pol || null,
         shippingLineId: formData.shippingLineId || null,
+        expectedReceiveDate:
+          moment(formData.expectedDate, "DD-MM-YYYY").format("YYYY-MM-DD") ||
+          null,
         shippingLineSeal: formData.shippingLineSeal || null,
         remarks: formData.containerRemarks || null,
         operation: "1",
       };
+
+      console.log("Payload::", payload);
 
       const response = await dispatch(
         createExpectedContainer(payload)
@@ -324,7 +512,10 @@ const ExpectedArrivalContainer = () => {
                 {/* Transport Mode & Load Status */}
                 <Row className="mb-3">
                   <Col md="4">
-                    <Label className="large mb-1">Yard Name</Label>
+                    <Label className="large mb-1">
+                      Yard Name{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </Label>
                     <select
                       name="yardName"
                       className={`form-select ${
@@ -347,7 +538,10 @@ const ExpectedArrivalContainer = () => {
                     )}
                   </Col>
                   <Col md="4">
-                    <Label className="large mb-1">Transport Mode</Label>
+                    <Label className="large mb-1">
+                      Transport Mode{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </Label>
                     <select
                       name="transportMode"
                       className={`form-select ${
@@ -367,7 +561,10 @@ const ExpectedArrivalContainer = () => {
                     )}
                   </Col>
                   <Col md="4">
-                    <Label className="large mb-1">Load Status</Label>
+                    <Label className="large mb-1">
+                      Load Status{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </Label>
                     <select
                       name="loadStatus"
                       className={`form-select ${
@@ -493,6 +690,29 @@ const ExpectedArrivalContainer = () => {
                 {/* Shipping Line Seal & Yard Name */}
                 <Row className="mb-3">
                   <Col md="6">
+                    <label>
+                      Expected Received Date{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
+                    <input
+                      name="expectedDate"
+                      type="text"
+                      className={`form-control ${
+                        formErrors.expectedDate ? "is-invalid" : ""
+                      }`}
+                      onChange={handleDateChange}
+                      value={formData.expectedDate}
+                      max={currentDate}
+                      min={minAllowedDate}
+                      placeholder="DD-MM-YYYY"
+                    />
+                    {formErrors.expectedDate && (
+                      <div className="invalid-feedback">
+                        {formErrors.expectedDate}
+                      </div>
+                    )}
+                  </Col>
+                  <Col md="6">
                     <Label className="large mb-1">Shipping Line Seal</Label>
                     <input
                       name="shippingLineSeal"
@@ -523,7 +743,7 @@ const ExpectedArrivalContainer = () => {
                       rows="3"
                       onChange={handleChange}
                       value={formData.containerRemarks}
-                      placeholder="Any Other Remarks"
+                      placeholder="Remarks"
                     ></textarea>
                   </Col>
                 </Row>

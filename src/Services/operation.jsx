@@ -117,6 +117,7 @@ const operationService = {
   onHireSurvey: (data) => request.post(`/on-hire/servey/create`, data),
   getStuffingLCLProceedDetail: (id) =>
     request.get(`/stuffing-lcl/stuffing-procced/${id}`),
+  getClientSurvey: () => request.get(`/client-servey/list`),
 };
 
 export default operationService;

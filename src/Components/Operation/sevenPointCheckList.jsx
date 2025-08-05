@@ -20,6 +20,7 @@ import { toast } from "react-toastify";
 import moment from "moment";
 import ImageUploadWithPreview from "../Common/ImageUpload/ImageUpload";
 import SelectableInput from "../Common/SelectableInput/selectableInput";
+import ClientService from "../../Services/clientApi";
 
 const SevenPointCheckList = () => {
   const { layoutURL } = useContext(CustomizerContext);
@@ -37,10 +38,11 @@ const SevenPointCheckList = () => {
   const currentDate = moment().format("DD-MM-YYYY");
   const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
   const [formErrors, setFormErrors] = useState({});
+  const [surveyClient, setSurveyClient] = useState([]);
 
   const [formData, setFormData] = useState({
     containerNumber: fetchedContainer?.container_number || "",
-    shippingLine: fetchedContainer?.shipping_line_id || "",
+    shippingLineId: fetchedContainer?.shipping_line_id || "",
     size: fetchedContainer?.size || "",
     type: fetchedContainer?.container_type || "",
     tareWeight: fetchedContainer?.tare_weight || "",
@@ -58,6 +60,7 @@ const SevenPointCheckList = () => {
     shippingLineSeal: "",
     containerCondition: "",
     anyOtherCondition: "",
+    clientName: "",
     dateOfInspection: "",
     nameOfIcd: "",
     customICD: "",
@@ -74,8 +77,6 @@ const SevenPointCheckList = () => {
     bookingNo: "",
   });
 
-  console.log("Fetched COntainer::", fetchedContainer);
-
   const [images, setImages] = useState([]);
 
   const handleChange = (e) => {
@@ -89,7 +90,20 @@ const SevenPointCheckList = () => {
   };
 
   const handleDateChange = async (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -137,7 +151,79 @@ const SevenPointCheckList = () => {
     }
   };
 
+  const fetchSurveyClient = async () => {
+    const res = await operationService.getClientSurvey();
+    setSurveyClient(res.data);
+  };
+
+  useEffect(() => {
+    fetchSurveyClient();
+  }, []);
+
   const handleSave = async () => {
+    const mandatoryFields = {
+      clientName: "Survey Client",
+      dateOfInspection: "Date of Inspection",
+      nameOfIcd: "Name of ICD",
+      yardName: "Yard Name",
+      inspectedBy: "Inspected By",
+    };
+
+    if (formData.nameOfIcd === "other") {
+      mandatoryFields.customICD = "Custom Yard";
+    }
+    if (formData.yardName == "other") {
+      mandatoryFields.customYard = "Custom Yard";
+    }
+
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (field) => !formData[field]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+
+      const newErrors = {};
+      emptyFields.forEach((field) => {
+        newErrors[field] = `${mandatoryFields[field]} is required`;
+      });
+      setFormErrors(newErrors);
+
+      return;
+    }
+
+    const inputDate = moment(formData.dateOfInspection, "DD-MM-YYYY");
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!inputDate.isValid()) {
+      toast.error("Invalid Date of Inspection");
+      setFormErrors((prev) => ({
+        ...prev,
+        dateOfInspection: "Invalid Date",
+      }));
+      return;
+    }
+    if (inputDate.isAfter(current)) {
+      toast.error("Inspection Date Cannot be in Future");
+      setFormErrors((prev) => ({
+        ...prev,
+        dateOfInspection: "Date cannot be in future",
+      }));
+      return;
+    }
+    if (inputDate.isBefore(minimum)) {
+      toast.error("Inspection Date cannot be more than 3 days in the past ");
+      setFormErrors((prev) => ({
+        ...prev,
+        dateOfInspection: "Date cannot be more than 3 days in the past",
+      }));
+      return;
+    }
+
     const formDataToSend = new FormData();
 
     // Helper function to convert empty strings to null
@@ -169,6 +255,7 @@ const SevenPointCheckList = () => {
         formData.nameOfIcd === "other" ? formData.customICD : formData.nameOfIcd
       )
     );
+    formDataToSend.append("clientName", toNullIfEmpty(formData.clientName));
     formDataToSend.append("booking_no", toNullIfEmpty(formData.bookingNo));
     formDataToSend.append(
       "yard_name",
@@ -212,9 +299,7 @@ const SevenPointCheckList = () => {
         );
         navigate(`${process.env.PUBLIC_URL}/app/operation/Admin`);
       }
-      console.log("Payload::", formDataToSend);
     } catch (error) {
-      console.log("Payload::", formDataToSend);
       toast.error(error.response?.data?.message || "Error saving checklist");
       console.error("Error:", error);
     } finally {
@@ -253,11 +338,36 @@ const SevenPointCheckList = () => {
                 disabled={true}
               />
 
+              <h5 className="mb-3 mt-5">
+                Survey Client <span className="large mb-1 text-danger">*</span>
+              </h5>
+              <Row className="mb-3">
+                <Col md="6">
+                  <Label className="mb-1 ">Survey Client</Label>
+                  <select
+                    name="clientName"
+                    className="form-select"
+                    value={formData.clientName}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select Survey CLient</option>
+                    {surveyClient.map((client) => (
+                      <option value={client.clientName}>
+                        {client.clientName}
+                      </option>
+                    ))}
+                  </select>
+                </Col>
+              </Row>
+
               <h5 className="mb-3 mt-5">Inspection Details</h5>
 
               <Row className="mb-3">
                 <Col md="6">
-                  <Label className="mb-1 ">Date of Inspection</Label>
+                  <Label className="mb-1 ">
+                    Date of Inspection{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </Label>
                   <input
                     name="dateOfInspection"
                     type="text"
@@ -277,7 +387,10 @@ const SevenPointCheckList = () => {
                   )}
                 </Col>
                 <Col md="6">
-                  <Label className="mb-1">Name Of ICD</Label>
+                  <Label className="mb-1">
+                    Name Of ICD{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </Label>
                   <select
                     name="nameOfIcd"
                     className="form-select"
@@ -308,7 +421,9 @@ const SevenPointCheckList = () => {
               </Row>
               <Row className="mb-3">
                 <Col md="6">
-                  <Label className="mb-1">Yard Name</Label>
+                  <Label className="mb-1">
+                    Yard Name <span className="large mb-1 text-danger">*</span>
+                  </Label>
                   <select
                     name="yardName"
                     className="form-select"
@@ -336,7 +451,10 @@ const SevenPointCheckList = () => {
                   )}
                 </Col>
                 <Col md="6">
-                  <Label className="mb-1">Inspected By</Label>
+                  <Label className="mb-1">
+                    Inspected By{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </Label>
                   <input
                     name="inspectedBy"
                     type="text"

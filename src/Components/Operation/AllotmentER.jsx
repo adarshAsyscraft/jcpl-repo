@@ -44,6 +44,7 @@ const AllotmentER = () => {
   const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
   const yardsState = useSelector((state) => state.yards || {});
   const yards = yardsState?.data || [];
+  const [lastOperation, setLastOperation] = useState(null);
 
   const [formData, setFormData] = useState({
     containerNumber,
@@ -56,6 +57,8 @@ const AllotmentER = () => {
     cscValidity: "",
     remarks: "",
     operation: selectedOperation,
+
+    previousDate: "",
 
     allotmentDate: "",
     transportMode: "",
@@ -124,17 +127,21 @@ const AllotmentER = () => {
     let result;
     if (lastOp == "2") {
       result = await operationService.arrivalContainer(containerNumber);
+      setLastOperation("Arrival");
     }
     if (lastOp == "3") {
       result = await operationService.destuffFCLContainer(containerNumber);
+      setLastOperation("Destuff FCL");
     }
     if (lastOp == "4") {
       result = await operationService.destuffLclContainer(containerNumber);
+      setLastOperation("Destuff LCL");
     }
     if (lastOp == "10") {
       result = await operationService.getInDataFechByContainerNumber(
         containerNumber
       );
+      setLastOperation("Gate In");
     }
     console.log("result::", result);
     if (result?.success) {
@@ -166,23 +173,153 @@ const AllotmentER = () => {
       mainRemark: previousData.remarks ?? "",
 
       loadStatus: "empty",
+      previousDate:
+        moment(previousData.inDate).format("DD-MM-YYYY") ??
+        moment(previousData.destuffDate).format("DD-MM-YYYY") ??
+        moment(previousData.arraival_date).format("DD-MM-YYYY") ??
+        "",
     }));
   }, [previousData]);
 
+  console.log("PreviousDate::", formData.previousDate);
+
+  // const handleSubmit = async () => {
+  //   try {
+  //     const mandatoryFields = {
+  //       allotmentDate: "Allotment Date",
+  //       transportMode: "Transport Mode",
+  //       yard: "Yard Name",
+  //     };
+
+  //     if (
+  //       !formData.allotmentDate ||
+  //       !formData.transportMode ||
+  //       !formData.yardName
+  //     ) {
+  //       toast.error("Please fill all required fields.");
+  //       return;
+  //     }
+
+  //     const formattedDate = moment(formData.allotmentDate, "DD-MM-YYYY").format(
+  //       "YYYY-MM-DD"
+  //     );
+
+  //     let payload;
+
+  //     // for road
+  //     if (formData.transportMode == "road") {
+  //       payload = {
+  //         containerNo: formData.containerNumber,
+  //         allotment_date: formattedDate,
+  //         transport_mode: "road",
+  //         yard_id: Number(formData.yardName),
+  //         gate_out_for: formData.getOutFor,
+  //         destination_place: formData.destinationPlace,
+  //         transporter: formData.transporter,
+  //         pol: formData.pol,
+  //         ref_no: formData.refNumber,
+  //         remark: formData.mainRemark,
+  //         dispatch_to_port_data: null,
+  //         load_status: formData.loadStatus,
+  //         status: formData.status,
+  //       };
+  //     }
+  //     // for rail
+  //     if (formData.transportMode == "rail") {
+  //       payload = {
+  //         containerNo: formData.containerNumber,
+  //         allotment_date: formattedDate,
+  //         yard_id: Number(formData.yardName) || null,
+  //         transport_mode: "rail",
+  //         gate_out_for: null,
+  //         destination_place: null,
+  //         transporter: null,
+  //         pol: formData.pol,
+  //         ref_no: formData.refNumber,
+  //         remark: formData.mainRemark,
+  //         dispatch_to_port_data: null,
+  //         load_status: formData.loadStatus,
+  //         status: formData.status,
+  //       };
+  //     }
+  //     console.log("payload::", payload);
+
+  //     const res = await operationService.allotmentER(payload);
+
+  //     if (res.success) {
+  //       toast.success(
+  //         `YOU HAVE SUCCESSFULLY SAVED ALLOTMENT-ER OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${res.data.id}`
+  //       );
+  //       localStorage.setItem("operation", 20);
+  //       navigate(`${process.env.PUBLIC_URL}/app/operation/Admin`);
+  //     } else {
+  //       toast.error(res.message || "Something went wrong.");
+  //     }
+
+  //     console.log("Payload::", payload);
+  //   } catch (error) {
+  //     console.error("Save failed:", error?.response?.data || error.message);
+  //     toast.error(
+  //       error?.response?.data?.message || "Failed to save Allotment ER"
+  //     );
+  //   }
+  // };
+
   const handleSubmit = async () => {
     try {
-      if (
-        !formData.allotmentDate ||
-        !formData.transportMode ||
-        !formData.yardName
-      ) {
-        toast.error("Please fill all required fields.");
+      // Check mandatory fields
+      const mandatoryFields = {
+        allotmentDate: "Allotment Date",
+        transportMode: "Transport Mode",
+        yardName: "Yard Name",
+      };
+
+      // Additional validation based on transport mode
+      if (formData.transportMode === "road") {
+        mandatoryFields.getOutFor = "Gate Out For";
+      } else if (formData.transportMode === "rail") {
+        mandatoryFields.pol = "POL";
+      }
+
+      const emptyFields = Object.keys(mandatoryFields).filter(
+        (field) => !formData[field]
+      );
+
+      if (emptyFields.length > 0) {
+        const missingFields = emptyFields
+          .map((field) => mandatoryFields[field])
+          .join(", ");
+        toast.error(`Please fill all required fields: ${missingFields}`);
         return;
       }
 
-      const formattedDate = moment(formData.allotmentDate, "DD-MM-YYYY").format(
-        "YYYY-MM-DD"
-      );
+      // Validate date format
+      const inputDate = moment(formData.allotmentDate, "DD-MM-YYYY", true);
+      const current = moment(currentDate, "DD-MM-YYYY");
+      const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+      const previous = moment(formData.previousDate, "DD-MM-YYYY");
+
+      if (!inputDate.isValid()) {
+        toast.error("Invalid date format for Allotment Date (DD-MM-YYYY)");
+        return;
+      }
+
+      if (inputDate.isAfter(current)) {
+        toast.error("Allotment Date cannot be in the future");
+        return;
+      }
+
+      if (inputDate.isBefore(previous)) {
+        toast.error(`Allotment Date cannot beefore ${lastOperation} date`);
+        return;
+      }
+
+      if (inputDate.isBefore(minimum)) {
+        toast.error("Allotment Date cannot be more than 3 days in the past");
+        return;
+      }
+
+      const formattedDate = inputDate.format("YYYY-MM-DD");
 
       let payload;
 
@@ -222,7 +359,6 @@ const AllotmentER = () => {
           status: formData.status,
         };
       }
-      console.log("payload::", payload);
 
       const res = await operationService.allotmentER(payload);
 
@@ -235,8 +371,6 @@ const AllotmentER = () => {
       } else {
         toast.error(res.message || "Something went wrong.");
       }
-
-      console.log("Payload::", payload);
     } catch (error) {
       console.error("Save failed:", error?.response?.data || error.message);
       toast.error(
@@ -273,7 +407,20 @@ const AllotmentER = () => {
   }, [fetchedContainer]);
 
   const handleDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -292,11 +439,12 @@ const AllotmentER = () => {
     const inputDate = moment(value, formatMap[separator], true);
     const current = moment(currentDate, "DD-MM-YYYY");
     const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+    const previous = moment(formData.previousDate, "DD-MM-YYYY");
 
     if (!value) {
       setFormErrors((prev) => ({
         ...prev,
-        [name]: "Out Date is required",
+        [name]: "Date is required",
       }));
     } else if (!isValidFormat || !inputDate.isValid()) {
       setFormErrors((prev) => ({
@@ -307,6 +455,11 @@ const AllotmentER = () => {
       setFormErrors((prev) => ({
         ...prev,
         [name]: "Date cannot be in the future",
+      }));
+    } else if (inputDate.isBefore(previous)) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: `Allotment Date cannot before ${lastOperation} date.`,
       }));
     } else if (inputDate.isBefore(minimum)) {
       setFormErrors((prev) => ({
@@ -343,7 +496,10 @@ const AllotmentER = () => {
               <h5 className="mb-3 mt-5">Allotment Empty Repositioning</h5>
               <Row className="mb-3">
                 <Col md="6">
-                  <label className="form-label">Allotment Date</label>
+                  <label className="form-label">
+                    Allotment Date{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     type="text"
                     name="allotmentDate"
@@ -363,7 +519,10 @@ const AllotmentER = () => {
               </Row>
               <Row className="mb-3">
                 <Col md="6">
-                  <label className="form-label">Transport Mode</label>
+                  <label className="form-label">
+                    Transport Mode{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
                     name="transportMode"
                     className="form-select"
@@ -376,8 +535,15 @@ const AllotmentER = () => {
                   </select>
                 </Col>
                 <Col md="6">
-                  <label>Yard Name</label>
+                  <label>
+                    Yard Name <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
+                    disabled={
+                      previousData?.yard ||
+                      previousData?.yardId ||
+                      previousData?.yard_id
+                    }
                     name="yardName"
                     onChange={handleChange}
                     value={formData.yardName}
@@ -403,7 +569,10 @@ const AllotmentER = () => {
                 {formData.transportMode === "road" && (
                   <Row className="mb-3">
                     <Col md="4">
-                      <label className="large mb-1">Get Out For</label>
+                      <label className="large mb-1">
+                        Gate Out For{" "}
+                        <span className="large mb-1 text-danger">*</span>
+                      </label>
                       <select
                         name="getOutFor"
                         className="form-select"
@@ -540,20 +709,25 @@ const AllotmentER = () => {
                     />
                   </Col>
                 </Row>
+                {formData.transportMode == "rail" && (
+                  <Row className="mb-3">
+                    <Col md="6">
+                      <label className="form-label">
+                        POL <span className="large mb-1 text-danger">*</span>
+                      </label>
+                      <input
+                        name="pol"
+                        type="text"
+                        className="form-control"
+                        placeholder="pol"
+                        value={formData.pol}
+                        onChange={handleChange}
+                      />
+                    </Col>
+                  </Row>
+                )}
               </div>
-              <Row className="mb-3">
-                <Col md="6">
-                  <label className="form-label">POL</label>
-                  <input
-                    name="pol"
-                    type="text"
-                    className="form-control"
-                    placeholder="pol"
-                    value={formData.pol}
-                    onChange={handleChange}
-                  />
-                </Col>
-              </Row>
+
               <div className="shadow-sm p-4 rounded mt-4">
                 <h5 className="mb-3 mt-4">Container Condition</h5>
                 <Row className="mb-3">

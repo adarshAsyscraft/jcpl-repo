@@ -39,6 +39,8 @@ const DispatchContainer = () => {
   const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
   const [dataByCartingNumber, setDataByCartingNumber] = useState({});
   let operationFromStorage = parseInt(localStorage.getItem("operation"), 10);
+  const [previousDate, setPreviousDate] = useState(null);
+  const [lastOperation, setLastOperation] = useState(0);
 
   const [formData, setFormData] = useState({
     containerNumber,
@@ -82,86 +84,6 @@ const DispatchContainer = () => {
     hsCode: "",
   });
 
-  // useEffect(() => {
-  //   const mergedData = {
-  //     containerNumber: fetchedContainer?.container_number || "",
-  //     shippingLineId: fetchedContainer?.shipping_line_id || "",
-  //     size: fetchedContainer?.size || "",
-  //     type: fetchedContainer?.container_type || "",
-  //     tareWeight: fetchedContainer?.tare_weight || "",
-  //     mgWeight: fetchedContainer?.mg_weight || "",
-  //     mfdDate: fetchedContainer?.mfd_date || "",
-  //     cscValidity: fetchedContainer?.csc_validity || "",
-  //     remarks: fetchedContainer?.remarks || "",
-
-  //     forwarder1:
-  //       previousPageData?.forwarder1 || previousPageData?.forwarder1Id || "",
-  //     forwarder2:
-  //       previousPageData?.forwarder2 || previousPageData?.forwarder2Id || "",
-  //     bookingNumber:
-  //       previousPageData?.bookingNumber ||
-  //       previousPageData?.booking_no ||
-  //       previousPageData?.bookingNo ||
-  //       "",
-  //     yard:
-  //       previousPageData?.yardId ||
-  //       previousPageData?.yard ||
-  //       previousPageData?.yard_id ||
-  //       previousPageData?.yardName ||
-  //       "",
-  //     transportMode: previousPageData?.transport_mode || "",
-  //     loadStatus:
-  //       previousPageData?.load_status ||
-  //       previousPageData?.loadStatus ||
-  //       "loaded",
-  //     vesselName:
-  //       previousPageData?.vesselViaNumber || previousPageData?.vesselByNo || "",
-  //     shipperName:
-  //       (previousPageData?.cargoDetails &&
-  //         previousPageData?.cargoDetails[0]?.shipperName) ||
-  //       "",
-  //     consigneeName:
-  //       (previousPageData?.cargoDetails &&
-  //         previousPageData?.cargoDetails[0]?.consigneeName) ||
-  //       "",
-  //     cargo:
-  //       (previousPageData?.cargoDetails &&
-  //         previousPageData?.cargoDetails[0]?.cargo) ||
-  //       "",
-  //     hsCode: previousPageData?.hsCode || "",
-  //     portOfDischarge:
-  //       previousPageData?.dischargePortName ||
-  //       previousPageData[0]?.pod ||
-  //       previousPageData?.pod ||
-  //       "",
-  //     pol: previousPageData?.pol || previousPageData[0]?.pol || "",
-  //     shipLine:
-  //       previousPageData?.shipline ||
-  //       previousPageData[0]?.shipping_line_seal ||
-  //       "",
-  //     custom:
-  //       previousPageData?.custom || previousPageData[0]?.custom_seal || "",
-  //     other: previousPageData?.other || "",
-  //     otherSealDescription:
-  //       previousPageData?.other_description ||
-  //       previousPageData?.otherSealRemark ||
-  //       "",
-  //     anyOtherRemarks: previousPageData?.anyOtherRemark || "",
-  //     containerRemarks:
-  //       previousPageData?.remarks || previousPageData?.remark || "",
-  //     fpd: previousPageData?.fpd || previousPageData[0]?.fpd || "",
-  //     refNo: previousPageData?.ref_no || "",
-  //     containerStatus: previousPageData?.containerStatus || "",
-  //   };
-
-  //   setFormData((prev) => ({
-  //     ...prev,
-  //     ...mergedData,
-  //   }));
-  // }, [fetchedContainer, previousPageData]);
-
-  // console.log("Fetched Container::", fetchedContainer);
-
   useEffect(() => {
     if (!fetchedContainer) return;
 
@@ -198,6 +120,65 @@ const DispatchContainer = () => {
   };
 
   const handleSave = async () => {
+    const mandatoryFields = {
+      transportMode: "Transport Mode",
+      dispatchDate: "Dispatch Date",
+    };
+
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (fields) => !formData[fields]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+      return;
+    }
+
+    // Forwarder validation
+    if (
+      formData.forwarder1 &&
+      formData.forwarder2 &&
+      formData.forwarder1 === formData.forwarder2
+    ) {
+      toast.error("Forwarder 1 and Forwarder 2 must be different");
+      setErrors((prev) => ({
+        ...prev,
+        forwarder2: "Forwarder 1 and Forwarder 2 must be different",
+        forwarder1: "Forwarder 1 and Forwarder 2 must be different",
+      }));
+      return;
+    }
+
+    const inputDate = moment(formData.dispatchDate, "DD-MM-YYYY", true);
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!inputDate.isValid()) {
+      toast.error("Invalid date format for Stuffing Date");
+      setErrors((prev) => ({
+        ...prev,
+        dispatchDate: "Invalid date format (DD-MM-YYYY)",
+      }));
+      return;
+    } else if (inputDate.isAfter(current)) {
+      toast.error("Dispatch Date cannot be in the future");
+      setErrors((prev) => ({
+        ...prev,
+        dispatchDate: "Date cannot be in the future",
+      }));
+      return;
+    } else if (inputDate.isBefore(minimum)) {
+      toast.error("Dispatch Date cannot be more than 3 days in the past");
+      setErrors((prev) => ({
+        ...prev,
+        dispatchDate: "Date cannot be more than 3 days in the past",
+      }));
+      return;
+    }
+
     const payload = {
       container_id: fetchedContainer.id,
       shipper_name: formData.shipperName,
@@ -210,7 +191,7 @@ const DispatchContainer = () => {
       load_status: formData.loadStatus,
       train_truck_no: formData.tainNo || formData.truckNo || null,
       wagon_no: formData.wagonNo || null,
-      transporter: formData.transportMode || null,
+      transporter: formData.transporter || null,
       vessel_name_voy: formData.vesselName || null, // Structured format
       pol: formData.pol || null, // Valid port
       port_of_discharge: formData.portOfDischarge || null, // Valid port
@@ -253,43 +234,6 @@ const DispatchContainer = () => {
     dispatch(fetchYards());
     dispatch(fetchTransporters());
   }, [dispatch, containerNumber]);
-
-  // const getPreviousPageData = async () => {
-  //   const operationFromStorage = parseInt(
-  //     localStorage.getItem("operation"),
-  //     10
-  //   );
-
-  //   let load_status = null;
-
-  //   if ([8, 24, 6].includes(operationFromStorage)) {
-  //     load_status = "loaded";
-  //   } else if (operationFromStorage === 20) {
-  //     load_status = "empty";
-  //   }
-
-  //   let res;
-
-  //   if (load_status === "loaded") {
-  //     const fetchMap = {
-  //       8: operationService.getFactoryStuffingDetails,
-  //       6: operationService.getICDStuffingDetails,
-  //       24: operationService.getStuffingProceedDetail,
-  //     };
-
-  //     const fetchFunc = fetchMap[operationFromStorage];
-
-  //     if (fetchFunc) {
-  //       res = await fetchFunc(containerNumber);
-  //       setPreviousPageData(res.data);
-  //       console.log("response1212::", res);
-  //       return;
-  //     }
-  //   } else if (load_status === "empty") {
-  //     res = await operationService.getAllotmentER(containerNumber);
-  //     setPreviousPageData(res.data);
-  //   }
-  // };
 
   const fetchCartingDetails = async () => {
     try {
@@ -335,6 +279,7 @@ const DispatchContainer = () => {
         6: operationService.getICDStuffingDetails,
         24: operationService.getStuffingLCLProceedDetail,
       };
+      setLastOperation("Stuffing");
 
       const fetchFunc = fetchMap[operationFromStorage];
 
@@ -347,18 +292,25 @@ const DispatchContainer = () => {
       }
     } else if (load_status == "empty") {
       res = await operationService.getAllotmentER(containerNumber);
+      setLastOperation("Allotment");
     }
-
+    console.log("Response::", res);
     if (res?.data) {
-      if (Array.isArray(res.data)) {
-        setPreviousPageData(res.data[0] || {});
-      } else {
-        setPreviousPageData(res.data);
-      }
-    } else {
+      // if (Array.isArray(res.data)) {
+      setPreviousDate(res.data.stuffingDate || res.data.allotment_date);
+      setPreviousPageData(res.data);
+    }
+    //  else {
+    //   setPreviousPageData(res.data);
+    //   setPreviousDate(res.data.allotment_date);
+    // }
+    // }
+    else {
       setPreviousPageData({});
     }
   };
+
+  console.log("PreviousDate::", previousDate);
 
   useEffect(() => {
     getPreviousPageData();
@@ -421,7 +373,8 @@ const DispatchContainer = () => {
         previousPageData?.remarks || previousPageData?.remark || "",
       fpd: previousPageData?.fpd || "",
       refNo: previousPageData?.ref_no || "",
-      containerStatus: previousPageData?.containerStatus || "",
+      containerStatus:
+        previousPageData?.containerStatus || previousPageData?.status || "",
     };
 
     setFormData((prev) => ({
@@ -430,50 +383,82 @@ const DispatchContainer = () => {
     }));
   }, [previousPageData]);
 
-  console.log("PreviousPageData ::", previousPageData);
-
   const handleDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
 
+    // Remove all non-digit characters
+    value = value.replace(/\D/g, "");
+
+    // Auto-format as user types (DD-MM-YYYY)
+    if (value.length > 2 && value.length <= 4) {
+      // Format as DD-MM when 3-4 digits entered
+      value = `${value.slice(0, 2)}-${value.slice(2)}`;
+    } else if (value.length > 4) {
+      // Format as DD-MM-YYYY when 5+ digits entered
+      value = `${value.slice(0, 2)}-${value.slice(2, 4)}-${value.slice(4, 8)}`;
+    }
+
+    // Update the form data with formatted value
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Allow only DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY using the same separator
-    const isValidFormat =
-      /^(0[1-9]|[12][0-9]|3[01])([-/.])(?:0[1-9]|1[0-2])\2\d{4}$/.test(value);
+    // Validate only when we have a complete date (DD-MM-YYYY)
+    if (value.length === 10) {
+      // Allow only DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY using the same separator
+      const isValidFormat =
+        /^(0[1-9]|[12][0-9]|3[01])([-/.])(?:0[1-9]|1[0-2])\2\d{4}$/.test(value);
 
-    // Determine correct format based on separator
-    const matched = value.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/);
-    const separator = matched?.[2];
-    const formatMap = {
-      "-": "DD-MM-YYYY",
-      "/": "DD/MM/YYYY",
-      ".": "DD.MM.YYYY",
-    };
-    const inputDate = moment(value, formatMap[separator], true);
-    const current = moment(currentDate, "DD-MM-YYYY");
-    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+      // Determine correct format based on separator
+      const matched = value.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/);
+      const separator = matched?.[2];
+      const formatMap = {
+        "-": "DD-MM-YYYY",
+        "/": "DD/MM/YYYY",
+        ".": "DD.MM.YYYY",
+      };
+      const inputDate = moment(value, formatMap[separator], true);
+      const current = moment(currentDate, "DD-MM-YYYY");
+      const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+      const destuffDate = moment(previousDate, "YYYY-MM-DD");
 
-    if (!value) {
+      if (!value) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Out Date is required",
+        }));
+      } else if (!isValidFormat || !inputDate.isValid()) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
+        }));
+      } else if (inputDate.isAfter(current)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be in the future",
+        }));
+      } else if (inputDate.isBefore(minimum)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be more than 3 days in the past",
+        }));
+      } else if (inputDate.isBefore(destuffDate)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: `Dispatch date must be on or after the ${lastOperation} date.`,
+        }));
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: undefined,
+        }));
+      }
+    } else if (value.length > 0 && value.length < 10) {
+      // Show error if partially entered date
       setErrors((prev) => ({
         ...prev,
-        [name]: "Out Date is required",
-      }));
-    } else if (!isValidFormat || !inputDate.isValid()) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
-      }));
-    } else if (inputDate.isAfter(current)) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: "Date cannot be in the future",
-      }));
-    } else if (inputDate.isBefore(minimum)) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: "Date cannot be more than 3 days in the past",
+        [name]: "Please enter complete date in DD-MM-YYYY format",
       }));
     } else {
+      // Clear errors if field is empty
       setErrors((prev) => ({
         ...prev,
         [name]: undefined,
@@ -505,6 +490,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Shipper Name</label>
                   <input
+                    disabled={
+                      previousPageData?.cargoDetails?.[0]?.shipperName ||
+                      dataByCartingNumber?.shipper
+                    }
                     name="shipperName"
                     className="form-control"
                     placeholder="Shipping Name"
@@ -515,6 +504,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label>Consignee Name</label>
                   <input
+                    disabled={
+                      previousPageData?.cargoDetails?.[0]?.consigneeName ||
+                      dataByCartingNumber?.consignee
+                    }
                     name="consigneeName"
                     className="form-control"
                     placeholder="Consignee Name"
@@ -527,6 +520,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Forwarder1 Code Name</label>
                   <select
+                    disabled={
+                      previousPageData?.forwarder1 ||
+                      previousPageData?.forwarder1Id
+                    }
                     name="forwarder1"
                     className="form-select form-select-sm"
                     onChange={handleChange}
@@ -546,6 +543,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Forwarder Code 2 Name</label>
                   <select
+                    disabled={
+                      previousPageData?.forwarder2 ||
+                      previousPageData?.forwarder2Id
+                    }
                     name="forwarder2"
                     className="form-select form-select-sm"
                     onChange={handleChange}
@@ -569,6 +570,11 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Booking Number</label>
                   <input
+                    disabled={
+                      previousPageData?.bookingNumber ||
+                      previousPageData?.booking_no ||
+                      previousPageData?.bookingNo
+                    }
                     name="bookingNumber"
                     className="form-control"
                     placeholder="Booking Number"
@@ -579,6 +585,12 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Yard</label>
                   <select
+                    disabled={
+                      previousPageData?.yardId ||
+                      previousPageData?.yard ||
+                      previousPageData?.yard_id ||
+                      previousPageData?.yardName
+                    }
                     name="yard"
                     className="form-select"
                     onChange={handleChange}
@@ -601,8 +613,12 @@ const DispatchContainer = () => {
               <h5 className="mb-3 mt-4">Transport Detail</h5>
               <Row className="mb-3">
                 <Col md="6">
-                  <label className="form-label">Transport Mode</label>
+                  <label className="form-label">
+                    Transport Mode{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
+                    disabled={previousPageData?.transport_mode}
                     name="transportMode"
                     className="form-select"
                     onChange={handleChange}
@@ -616,6 +632,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Load Status</label>
                   <select
+                    disabled={
+                      previousPageData?.load_status ||
+                      previousPageData?.loadStatus
+                    }
                     name="loadStatus"
                     className="form-select"
                     onChange={handleChange}
@@ -623,7 +643,7 @@ const DispatchContainer = () => {
                   >
                     <option value="">Load Status</option>
                     <option value="empty">Empty</option>
-                    <option value="loaded">Load</option>
+                    <option value="loaded">Loaded</option>
                   </select>
                 </Col>
               </Row>
@@ -693,6 +713,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label>Vessel Name</label>
                   <input
+                    disabled={
+                      previousPageData?.vesselViaNumber ||
+                      previousPageData?.vesselByNo
+                    }
                     name="vesselName"
                     className="form-control"
                     placeholder="Vessel Name"
@@ -703,6 +727,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label>Cargo</label>
                   <input
+                    disabled={
+                      previousPageData?.cargoDetails?.[0]?.cargo ||
+                      dataByCartingNumber?.cargo
+                    }
                     name="cargo"
                     className="form-control"
                     placeholder="Cargo"
@@ -716,6 +744,7 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">POL</label>
                   <input
+                    disabled={previousPageData?.pol}
                     name="pol"
                     className="form-control"
                     placeholder="POL"
@@ -726,6 +755,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Port of Discharge</label>
                   <input
+                    disabled={
+                      previousPageData?.dischargePortName ||
+                      previousPageData?.pod
+                    }
                     name="portOfDischarge"
                     className="form-control"
                     placeholder="Port Of Discharge"
@@ -739,6 +772,7 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">FPD</label>
                   <input
+                    disabled={previousPageData?.fpd}
                     name="fpd"
                     type="text"
                     placeholder="FPD"
@@ -748,7 +782,10 @@ const DispatchContainer = () => {
                   />
                 </Col>
                 <Col md="6">
-                  <label className="form-label">Dispatch Date</label>
+                  <label className="form-label">
+                    Dispatch Date{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="dispatchDate"
                     type="text"
@@ -771,6 +808,7 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Ref No</label>
                   <input
+                    disabled={previousPageData?.ref_no}
                     name="refNo"
                     type="text"
                     placeholder="Ref No."
@@ -782,6 +820,7 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">HS Code</label>
                   <input
+                    disabled={previousPageData?.hsCode}
                     name="hsCode"
                     type="text"
                     placeholder="HS Code"
@@ -797,6 +836,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Ship Line</label>
                   <input
+                    disabled={
+                      previousPageData?.shipline ||
+                      previousPageData?.shipping_line_seal
+                    }
                     name="shipLine"
                     type="text"
                     className="form-control"
@@ -808,6 +851,9 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Custom</label>
                   <input
+                    disabled={
+                      previousPageData?.custom || previousPageData?.custom_seal
+                    }
                     name="custom"
                     type="text"
                     className="form-control"
@@ -821,6 +867,7 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Other</label>
                   <input
+                    disabled={previousPageData?.other}
                     name="other"
                     type="text"
                     className="form-control"
@@ -832,6 +879,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Other Seal Description</label>
                   <input
+                    disabled={
+                      previousPageData?.other_description ||
+                      previousPageData?.otherSealRemark
+                    }
                     name="otherSealDescription"
                     type="text"
                     className="form-control"
@@ -847,6 +898,10 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Container Status</label>
                   <select
+                    disabled={
+                      previousPageData?.containerStatus ||
+                      previousPageData?.status
+                    }
                     name="containerStatus"
                     className="form-select"
                     onChange={handleChange}
@@ -860,6 +915,9 @@ const DispatchContainer = () => {
                 <Col md="6">
                   <label className="form-label">Remarks</label>
                   <textarea
+                    disabled={
+                      previousPageData?.remarks || previousPageData?.remark
+                    }
                     name="containerRemarks"
                     className="form-control"
                     rows="3"

@@ -28,6 +28,7 @@ const MeasurementDetails = () => {
   const forwarders = forwardersState?.data || [];
   const { icds, loading } = useSelector((state) => state.icd);
   const [measurementRateData, setMeasurementRateData] = useState({});
+  const [packageMismatch, setPackageMismatch] = useState(false);
   const dispatch = useDispatch();
 
   // Initialize formData as an empty object
@@ -147,21 +148,53 @@ const MeasurementDetails = () => {
   }, [dispatch]);
 
   // Function to handle input changes
+  // const handleInputChange = (index, field, value) => {
+  //   const updatedForms = [...formList];
+
+  //   // Safely parse value
+  //   const parsedValue = value === "" ? "" : parseFloat(value);
+
+  //   updatedForms[index][field] = parsedValue;
+
+  //   // Recalculate cubic metres when any dimension changes
+  //   if (["length", "breadth", "height"].includes(field)) {
+  //     const length = updatedForms[index].length || 0;
+  //     const breadth = updatedForms[index].breadth || 0;
+  //     const height = updatedForms[index].height || 0;
+
+  //     updatedForms[index].cubicMetres = +(
+  //       (length * breadth * height) /
+  //       100000
+  //     ).toFixed(3);
+  //   }
+
+  //   setFormList(updatedForms);
+  // };
+
   const handleInputChange = (index, field, value) => {
     const updatedForms = [...formList];
 
-    // Safely parse value
-    const parsedValue = value === "" ? 0 : parseFloat(value);
+    // For marks field, keep it as text
+    if (field === "marks") {
+      updatedForms[index][field] = value;
+    }
+    // For other fields, parse as number
+    else {
+      // Safely parse value - use empty string for empty input
+      const parsedValue = value === "" ? "" : parseFloat(value) || 0;
+      updatedForms[index][field] = parsedValue;
 
-    updatedForms[index][field] = parsedValue;
+      // Recalculate cubic metres when any dimension changes
+      if (["length", "breadth", "height"].includes(field)) {
+        const length = updatedForms[index].length || 0;
+        const breadth = updatedForms[index].breadth || 0;
+        const height = updatedForms[index].height || 0;
 
-    // Recalculate cubic metres when any dimension changes
-    if (["length", "breadth", "height"].includes(field)) {
-      const length = updatedForms[index].length || 0;
-      const breadth = updatedForms[index].breadth || 0;
-      const height = updatedForms[index].height || 0;
-
-      updatedForms[index].cubicMetres = +(length * breadth * height).toFixed(3);
+        updatedForms[index].cubicMetres = +(
+          (length * breadth * height) /
+          100000
+        ).toFixed(3);
+      }
     }
 
     setFormList(updatedForms);
@@ -198,12 +231,32 @@ const MeasurementDetails = () => {
   const handleChange = (e) => {
     let { name, value } = e.target;
 
-    if (e.target.type == "text") {
+    if (e.target.type === "text") {
       value = value.toUpperCase();
+    }
+
+    if (name === "gstNumber") {
+      if (value.length !== 15) {
+        setFormErrors((prev) => ({
+          ...prev,
+          [name]: "GST number should have 15 characters",
+        }));
+      } else {
+        setFormErrors((prev) => ({
+          ...prev,
+          [name]: "",
+        }));
+      }
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+  useEffect(() => {
+    const totalPackages = getTotal("numOfPackages");
+    const formPackages = parseInt(formData.noOfPackages) || 0;
+    setPackageMismatch(totalPackages !== formPackages);
+  }, [formData.noOfPackages, formList]);
 
   const getMeasurementRate = async () => {
     try {
@@ -245,7 +298,129 @@ const MeasurementDetails = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.measurementType, formData.shippingLine]);
 
+  // const handleSave = async () => {
+  //   const formattedMeasurementDate = moment(
+  //     formData.measurementDate,
+  //     "DD-MM-YYYY"
+  //   ).format("YYYY-MM-DD");
+
+  //   const formattedShipBillDate = moment(
+  //     formData.shipBillDate,
+  //     "DD-MM-YYYY"
+  //   ).format("YYYY-MM-DD");
+
+  //   const payload = {
+  //     ship_bill_no: formData.shipBillNumber || null,
+  //     measurement_date: formattedMeasurementDate,
+  //     measurement_type: formData.measurementType,
+  //     type_of_payment: formData.typeOfPayment,
+  //     ship_line_forwarder_name: formData.shippingLine || "ABC Logistics",
+  //     service_tax: parseFloat(formData.serviceTax) || 0,
+  //     service_tax_rate: parseFloat(formData.serviceTaxRate) || 0,
+  //     shipper_applicant: formData.shipperApplicant,
+  //     clearing_agent: formData.clearingAgent,
+  //     no_of_packages: parseInt(formData.noOfPackages) || 0,
+  //     packed_in: formData.packedIn,
+  //     pod: formData.pod,
+  //     fpd: formData.fpd,
+  //     cargo: formData.cargo,
+  //     hs_code: formData.hsCode,
+  //     ship_bill_date: formattedShipBillDate,
+  //     icd_cfs: formData.icdCfs,
+  //     any_other_remarks: formData.anyOtherRemarks,
+  //     location_of_cargo: formData.locationOfCargo,
+  //     paid_by: formData.paidBy,
+  //     gstn_no: formData.gstNumber,
+  //     packages_included_minimum_amount:
+  //       parseInt(formData.packageIncludedInMinimumAmount) || 0,
+  //     rate_for_additional_package:
+  //       parseFloat(formData.rateForAdditionalPackage) || 0,
+  //     minimum_amount: parseFloat(formData.minimumAmount) || 0,
+  //     additional_amount: parseFloat(formData.additionalAmount) || 0,
+  //     service_tax_amount: parseFloat(formData.serviceTaxAmount) || 0,
+  //     total_amount: parseFloat(formData.totalAmount) || 0,
+  //     table_rows_data: formList.map((row, index) => ({
+  //       row_id: index + 1,
+  //       description: row.marks,
+  //       quantity: row.numOfPackages,
+  //       weight: row.cubicMetres,
+  //     })),
+  //   };
+
+  //   const response = await operationService.measurment(payload);
+  //   console.log("MSG::", response);
+  //   if (response.success) {
+  //     toast.success(
+  //       `YOU HAVE SUCCESSFULLY SAVED MEASUREMENT OPERATION. WHERE ENTRY ID IS ${response.data.id}`
+  //     );
+  //   } else if (response.msg == "Shipp Bill Number Does not exist") {
+  //     toast.error("Shipp Bill Number Does not exist");
+  //   }
+  // };
+
   const handleSave = async () => {
+    const mandatoryFields = {
+      typeOfPayment: "Type of Payment",
+      shippingLine: "Shipping Line",
+      serviceTax: "GST",
+      noOfPackages: "Number of Packages",
+      icdCfs: "ICD/CFS",
+      paidBy: "Paid By",
+      gstNumber: "GST Number",
+    };
+
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (field) => !formData[field]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+
+      const newErrors = {};
+      emptyFields.forEach((field) => {
+        newErrors[field] = `${mandatoryFields[field]} is required`;
+      });
+      setFormErrors(newErrors);
+
+      return;
+    }
+
+    if (formData.shipBillDate) {
+      const inputDate = moment(formData.shipBillDate, "DD-MM-YYYY", true);
+      const current = moment(currentDate, "DD-MM-YYYY");
+
+      if (!inputDate.isValid) {
+        toast.error("Invalid Ship Bill Date format");
+        setFormErrors((prev) => ({
+          ...prev,
+          shipBillDate: "Invalid Date format",
+        }));
+        return;
+      }
+
+      if (inputDate.isAfter(current)) {
+        toast.error("Ship Bill Date cannot be in future");
+        setFormErrors((prev) => ({
+          ...prev,
+          shipBillDate: "Date cannot be in future",
+        }));
+        return;
+      }
+    }
+
+    const gstNumber = formData.gstNumber;
+    if (gstNumber.length !== 15) {
+      toast.error("Invalid GST Number, length should be of 15 characters");
+      setFormErrors((prev) => ({
+        ...prev,
+        shipBillDate: "Invalid GST Number",
+      }));
+      return;
+    }
+
     const formattedMeasurementDate = moment(
       formData.measurementDate,
       "DD-MM-YYYY"
@@ -295,10 +470,63 @@ const MeasurementDetails = () => {
     };
 
     const response = await operationService.measurment(payload);
+    console.log("MSG::", response);
     if (response.success) {
       toast.success(
         `YOU HAVE SUCCESSFULLY SAVED MEASUREMENT OPERATION. WHERE ENTRY ID IS ${response.data.id}`
       );
+
+      // Reset formData to initial state
+      setFormData({
+        shipBillNumber: "",
+        measurementNumber: "",
+        measurementDate: moment().format("DD-MM-YYYY"),
+        typeOfPayment: "",
+        shippingLine: "",
+        serviceTax: "applicable",
+        serviceTaxRate: "",
+        shipperApplicant: "",
+        clearingAgent: "",
+        noOfPackages: "",
+        packedIn: "",
+        pod: "",
+        fpd: "",
+        cargo: "",
+        hsCode: "",
+        shipBillDate: "",
+        icdCfs: "",
+        anyOtherRemarks: "",
+        locationOfCargo: "",
+        measurementType: "export",
+        paidBy: "",
+        gstNumber: "",
+        formatType: "pdf",
+        receiptNeeded: "yes",
+        packageIncludedInMinimumAmount: "",
+        rateForAdditionalPackage: "",
+        minimumAmount: "",
+        additionalAmount: "",
+        totalAmount: "",
+        serviceTaxAmount: "",
+        gstRate: "",
+      });
+
+      // Reset formList to initial state with one empty row
+      setFormList([
+        {
+          marks: "",
+          numOfPackages: 0,
+          length: 0,
+          breadth: 0,
+          height: 0,
+          cubicMetres: 0.0,
+        },
+      ]);
+
+      // Also reset cartingData if needed
+      setCartingData({});
+    } else if (response.msg == "Shipp Bill Number Does not exist") {
+      toast.error("Shipp Bill Number Does not exist");
     }
   };
 
@@ -325,7 +553,7 @@ const MeasurementDetails = () => {
         toast.success("Carting Details Fetched Successfully!");
         setCartingData({ data: cartingArray });
       } else {
-        toast.error("Ship Bill Number not found");
+        toast.error(`Record for ${formData.shipBillNumber} does not exist!`);
         setCartingData({});
         setFormData((prev) => ({
           ...prev,
@@ -397,7 +625,19 @@ const MeasurementDetails = () => {
   ]);
 
   const handleDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    // Remove all non-digit characters
+    value = value.replace(/\D/g, "");
+
+    // Auto-format as user types (DD-MM-YYYY)
+    if (value.length > 2 && value.length <= 4) {
+      // Format as DD-MM when 3-4 digits entered
+      value = `${value.slice(0, 2)}-${value.slice(2)}`;
+    } else if (value.length > 4) {
+      // Format as DD-MM-YYYY when 5+ digits entered
+      value = `${value.slice(0, 2)}-${value.slice(2, 4)}-${value.slice(4, 8)}`;
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -429,12 +669,7 @@ const MeasurementDetails = () => {
       }));
     } else if (name === "measurementDate") {
       // Only apply before/after validation for allotmentDate
-      if (inputDate.isAfter(current)) {
-        setFormErrors((prev) => ({
-          ...prev,
-          [name]: "Date cannot be in the future",
-        }));
-      } else if (inputDate.isBefore(minimum)) {
+      if (inputDate.isBefore(minimum)) {
         setFormErrors((prev) => ({
           ...prev,
           [name]: "Date cannot be more than 3 days in the past",
@@ -445,6 +680,11 @@ const MeasurementDetails = () => {
           [name]: undefined,
         }));
       }
+    } else if (inputDate.isAfter(current)) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "Date cannot be in the future",
+      }));
     } else {
       // For other dates (like shipBillDate), just clear the error if format is valid
       setFormErrors((prev) => ({
@@ -505,6 +745,7 @@ const MeasurementDetails = () => {
                 <Col md="6">
                   <label htmlFor="">Measurement Date</label>
                   <input
+                    disabled
                     name="measurementDate"
                     type="text"
                     className={`form-control ${
@@ -525,7 +766,10 @@ const MeasurementDetails = () => {
               </Row>
               <Row className="mb-3">
                 <Col md="6">
-                  <label htmlFor="">Type Of Payment</label>
+                  <label htmlFor="">
+                    Type Of Payment{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
                     name="typeOfPayment"
                     className="form-select"
@@ -539,7 +783,10 @@ const MeasurementDetails = () => {
                   </select>
                 </Col>
                 <Col md="6">
-                  <label htmlFor="">Shipping Line</label>
+                  <label htmlFor="">
+                    Shipping Line{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
                     name="shippingLine"
                     className="form-select"
@@ -557,7 +804,9 @@ const MeasurementDetails = () => {
               </Row>
               <Row className="mb-3">
                 <Col md="6">
-                  <label htmlFor="">GST</label>
+                  <label htmlFor="">
+                    GST <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
                     name="serviceTax"
                     className="form-select"
@@ -607,7 +856,10 @@ const MeasurementDetails = () => {
               </Row>
               <Row className="mb-3">
                 <Col md="6">
-                  <label htmlFor="">Number Of Packages</label>
+                  <label htmlFor="">
+                    Number Of Packages{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="noOfPackages"
                     type="text"
@@ -683,14 +935,23 @@ const MeasurementDetails = () => {
                   <input
                     name="shipBillDate"
                     type="text"
-                    className="form-control"
-                    placeholder="ShipBill Date"
-                    onChange={handleChange}
+                    className={`form-control ${
+                      formErrors.shipBillDate ? "is-invalid" : ""
+                    }`}
+                    placeholder="DD-MM-YYYY"
+                    onChange={handleDateChange}
                     value={formData.shipBillDate}
                   />
+                  {formErrors.shipBillDate && (
+                    <div className="invalid-feedback">
+                      {formErrors.shipBillDate}
+                    </div>
+                  )}
                 </Col>
                 <Col md="6">
-                  <label>ICD/CFS</label>
+                  <label>
+                    ICD/CFS <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
                     name="icdCfs"
                     onChange={handleChange}
@@ -732,7 +993,10 @@ const MeasurementDetails = () => {
               </Row>
               <Row className="mb-3">
                 <Col md="6">
-                  <label htmlFor="">Paid By</label>
+                  <label htmlFor="">
+                    {" "}
+                    Paid By <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
                     name="paidBy"
                     className="form-select"
@@ -746,15 +1010,24 @@ const MeasurementDetails = () => {
                   </select>
                 </Col>
                 <Col md="6">
-                  <label htmlFor="">GST Number</label>
+                  <label htmlFor="">
+                    GST Number <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="gstNumber"
                     type="text"
-                    className="form-control"
+                    className={`form-control ${
+                      formErrors.gstNumber ? "is-invalid" : ""
+                    }`}
                     placeholder="GST Number"
                     onChange={handleChange}
                     value={formData.gstNumber}
                   />
+                  {formErrors.gstNumber && (
+                    <div className="invalid-feedback">
+                      {formErrors.gstNumber}
+                    </div>
+                  )}
                 </Col>
               </Row>
               <Row className="mb-3">
@@ -853,7 +1126,7 @@ const MeasurementDetails = () => {
                       <td>{index + 1}</td>
                       <td>
                         <input
-                          type="text"
+                          type="text" // Changed to text for marks field
                           className="form-control"
                           value={form.marks}
                           onChange={(e) =>
@@ -870,11 +1143,11 @@ const MeasurementDetails = () => {
                       ].map((field) => (
                         <td key={field}>
                           <input
-                            type="number"
+                            type="number" // All other fields are number type
                             className="form-control"
                             value={
                               field === "cubicMetres"
-                                ? parseFloat(form[field] || 0).toFixed(3) // ✅ Force 3 decimal places
+                                ? parseFloat(form[field] || 0).toFixed(3)
                                 : form[field]
                             }
                             onChange={(e) =>
@@ -899,7 +1172,15 @@ const MeasurementDetails = () => {
                     <td colSpan={2} className="text-center">
                       Total
                     </td>
-                    <td>{getTotal("numOfPackages")}</td>
+                    <td>
+                      {getTotal("numOfPackages")}
+                      {packageMismatch && (
+                        <div className="text-danger small">
+                          Total is {getTotal("numOfPackages")} and expected is{" "}
+                          {formData.noOfPackages}
+                        </div>
+                      )}
+                    </td>
                     <td>{getTotal("length")}</td>
                     <td>{getTotal("breadth")}</td>
                     <td>{getTotal("height")}</td>

@@ -99,7 +99,20 @@ const OnHire = () => {
   };
 
   const handleDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes as DD-MM-YYYY
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -148,6 +161,61 @@ const OnHire = () => {
   };
 
   const handleSave = async () => {
+    const mandatoryFields = {
+      onHireDate: "Off Hire Date",
+      hireFrom: "Hired From",
+      hireTo: "Hired To",
+      yardId: "Yard Name",
+    };
+
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (field) => !formData[field]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+
+      const newErrors = {};
+      emptyFields.forEach((field) => {
+        newErrors[field] = `${mandatoryFields[field]} is required`;
+      });
+      setErrors(newErrors);
+
+      return;
+    }
+
+    const inputDate = moment(formData.onHireDate, "DD-MM-YYYY");
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!inputDate.isValid()) {
+      toast.error("Invalid Off Hire Date");
+      setErrors((prev) => ({
+        ...prev,
+        onHireDate: "Invalid Date",
+      }));
+      return;
+    }
+    if (inputDate.isAfter(current)) {
+      toast.error("Off Hire Date Cannot be in Future");
+      setErrors((prev) => ({
+        ...prev,
+        onHireDate: "Date cannot be in future",
+      }));
+      return;
+    }
+    if (inputDate.isBefore(minimum)) {
+      toast.error("Off Hire Date cannot be more than 3 days in the past ");
+      setErrors((prev) => ({
+        ...prev,
+        onHireDate: "Date cannot be more than 3 days in the past",
+      }));
+      return;
+    }
+
     const payload = {
       container_id: fetchedContainer.id,
       hire_from_id: formData.hireFrom,
@@ -202,7 +270,10 @@ const OnHire = () => {
                 <h5 className="mb-3 mt-5">On Hire Details</h5>
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Hired Date</label>
+                    <label>
+                      Hired Date{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="onHireDate"
                       type="text"
@@ -220,7 +291,10 @@ const OnHire = () => {
                     )}
                   </Col>
                   <Col md="6">
-                    <label>Yard Name</label>
+                    <label>
+                      Yard Name{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="yardId"
                       onChange={handleChange}
@@ -245,7 +319,10 @@ const OnHire = () => {
                 </Row>
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Hired From</label>
+                    <label>
+                      Hired From{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="hireFrom"
                       className="form-select"
@@ -262,7 +339,9 @@ const OnHire = () => {
                     </select>
                   </Col>
                   <Col md="6">
-                    <label>Hired To</label>
+                    <label>
+                      Hired To <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="hireTo"
                       className="form-select"

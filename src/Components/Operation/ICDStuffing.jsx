@@ -25,10 +25,11 @@ const ICDStuffing = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const currentDate = moment().format("YYYY-MM-DD");
+  const currentDate = moment().format("DD-MM-YYYY");
   const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
   const { fetchedContainer } = useSelector((state) => state.container);
   const [previousPageData, setPreviousPageData] = useState({});
+  const lastOperation = localStorage.getItem("operation");
 
   const [formList, setFormList] = useState([]);
   const [formListContainer, setFormListContainer] = useState([]);
@@ -36,14 +37,7 @@ const ICDStuffing = () => {
   const selectedOperation = location.state?.operation || "";
   const [vgm, setVGM] = useState(0);
   const [vgmDiff, setVgmDiff] = useState(0);
-  const [errors, setErrors] = useState({
-    cargoCategory: "",
-    imoNumber: "",
-    unNumber: "",
-    temprature: "",
-    stuffingDate: "",
-    vgmByShipper: "",
-  });
+  const [errors, setErrors] = useState([]);
 
   const [formData, setFormData] = useState({
     containerNumber,
@@ -216,6 +210,52 @@ const ICDStuffing = () => {
   };
 
   const handleInputChange = (index, field, value) => {
+    if (field === "shipBillDate") {
+      value = value.replace(/\D/g, "");
+      if (value.length > 8) value = value.slice(0, 8);
+
+      if (value.length > 4) {
+        value = `${value.slice(0, 2)}-${value.slice(2, 4)}-${value.slice(4)}`;
+      } else if (value.length > 2) {
+        value = `${value.slice(0, 2)}-${value.slice(2)}`;
+      }
+
+      if (value.length === 10) {
+        const datePattern = /^(\d{2})([-/.])(\d{2})\2(\d{4})$/;
+        const match = value.match(datePattern);
+
+        setErrors((prev) => {
+          const safePrev = Array.isArray(prev) ? prev : [];
+          const newErrors = [...safePrev];
+          newErrors[index] = { ...newErrors[index] };
+
+          if (!match) {
+            newErrors[index].shipBillDate = "Date must be in DD-MM-YYYY format";
+          } else {
+            const [, day, separator, month, year] = match;
+            const dateStr = `${day}${separator}${month}${separator}${year}`;
+            const dateMoment = moment(
+              dateStr,
+              `DD${separator}MM${separator}YYYY`,
+              true
+            );
+
+            if (!dateMoment.isValid()) {
+              newErrors[index].shipBillDate = "Invalid date";
+            } else if (dateMoment.isAfter(moment())) {
+              newErrors[index].shipBillDate = "Date cannot be in the future";
+            } else {
+              newErrors[index].shipBillDate = undefined;
+            }
+          }
+
+          return newErrors;
+        });
+      }
+    } else {
+      value = value.toUpperCase();
+    }
+
     setFormList((prevForms) =>
       prevForms.map((form, i) =>
         i === index ? { ...form, [field]: value } : form
@@ -253,70 +293,213 @@ const ICDStuffing = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
 
     if (name === "vgmByShipper") {
-      const updatedVgmByShipper =
-        name === "vgmByShipper"
-          ? parseFloat(value)
-          : parseFloat(formData.vgmByShipper || 0);
+      // Use the value the user just typed
+      const vgmByShipper = parseFloat(value || 0);
+      const calculatedVgm = parseFloat(vgm || 0);
+      const vgmDifference = calculatedVgm - vgmByShipper;
 
-      // Check VGM difference logic
-      const difference = Number(vgm - updatedVgmByShipper);
-      setVgmDiff(difference);
-    }
-
-    const updatedErrors = {};
-
-    // Stuffing date validation
-    if (name === "stuffingDate") {
-      updatedErrors.stuffingDate =
-        value > currentDate
-          ? "Stuffing Date is not greater than current date"
-          : "";
-    }
-
-    // Cargo Category validation
-    if (name === "cargoCategory") {
-      updatedErrors.cargoCategory = value ? "" : "Cargo Category is Required";
-    }
-
-    const cargoCategory =
-      name === "cargoCategory" ? value : formData.cargoCategory || "";
-
-    const isHazardous =
-      cargoCategory === "hazardous" || cargoCategory === "both";
-    const isReefer = cargoCategory === "reefer" || cargoCategory === "both";
-
-    // Hazardous cargo validations
-    if (isHazardous) {
-      if (name === "imoNumber") {
-        updatedErrors.imoNumber = value
-          ? ""
-          : "IMO Number is required for hazardous cargo";
-      }
-      if (name === "unNumber") {
-        updatedErrors.unNumber = value
-          ? ""
-          : "UN Number is required for hazardous cargo";
+      // Allow ±1000 difference
+      if (value && (vgmDifference < -1000 || vgmDifference > 1000)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "VGM is incorrect",
+        }));
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "",
+        }));
       }
     }
+  };
 
-    // Reefer cargo validation
-    if (isReefer && name === "temprature") {
-      updatedErrors.temprature = value
-        ? ""
-        : "Temperature is required for reefer cargo";
+  const handleDateChange = (e) => {
+    let { name, value } = e.target;
+
+    // Remove all non-digit characters
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert separators as user types
+    if (value.length > 4) {
+      value = `${value.slice(0, 2)}-${value.slice(2, 4)}-${value.slice(4)}`;
+    } else if (value.length > 2) {
+      value = `${value.slice(0, 2)}-${value.slice(2)}`;
     }
 
-    // Set errors if any
-    if (Object.keys(updatedErrors).length > 0) {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Validate only when we have a complete date (DD-MM-YYYY)
+    if (value.length === 10) {
+      const datePattern = /^(\d{2})([-/.])(\d{2})\2(\d{4})$/;
+      const match = value.match(datePattern);
+
+      if (!match) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date must be in DD-MM-YYYY format",
+        }));
+        return;
+      }
+
+      const [, day, separator, month, year] = match;
+      const dateStr = `${day}${separator}${month}${separator}${year}`;
+      const dateMoment = moment(
+        dateStr,
+        `DD${separator}MM${separator}YYYY`,
+        true
+      );
+
+      if (!dateMoment.isValid()) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Invalid date",
+        }));
+        return;
+      }
+
+      const current = moment();
+      const minDate = moment().subtract(3, "days");
+
+      if (dateMoment.isAfter(current)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be in the future",
+        }));
+      } else if (dateMoment.isBefore(minDate)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be more than 3 days in the past",
+        }));
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: undefined,
+        }));
+      }
+    } else if (value.length > 0) {
+      // Show error if partially entered but not complete
       setErrors((prev) => ({
         ...prev,
-        ...updatedErrors,
+        [name]: "Please enter a complete date in DD-MM-YYYY format",
+      }));
+    } else {
+      // Clear error if empty
+      setErrors((prev) => ({
+        ...prev,
+        [name]: undefined,
       }));
     }
   };
 
   const handleSave = async () => {
-    const newErrors = {};
+    const mandatoryFields = {
+      stuffingDate: "Stuffing Date",
+      cargoCategory: "Cargo Category",
+      yardName: "Yard Name",
+      vgmByShipper: "VGM By Shipper",
+      containerStatus: "Container Status",
+    };
+
+    if (formData.cargoCategory === "hazardous") {
+      mandatoryFields.imoNumber = "IMO Number";
+      mandatoryFields.unNumber = "UN Number";
+    } else if (formData.cargoCategory === "refer") {
+      mandatoryFields.temperature = "Temperature";
+    } else if (formData.cargoCategory === "both") {
+      mandatoryFields.imoNumber = "IMO Number";
+      mandatoryFields.unNumber = "UN Number";
+      mandatoryFields.temperature = "Temperature";
+    }
+
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (fields) => !formData[fields]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+      return;
+    }
+
+    // Forwarder validation
+    if (
+      formData.forwarder1 &&
+      formData.forwarder2 &&
+      formData.forwarder1 === formData.forwarder2
+    ) {
+      toast.error("Forwarder 1 and Forwarder 2 must be different");
+      setErrors((prev) => ({
+        ...prev,
+        forwarder2: "Forwarder 1 and Forwarder 2 must be different",
+        forwarder1: "Forwarder 1 and Forwarder 2 must be different",
+      }));
+      return;
+    }
+
+    const inputDate = moment(formData.stuffingDate, "DD-MM-YYYY", true);
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!inputDate.isValid()) {
+      toast.error("Invalid date format for Stuffing Date");
+      setErrors((prev) => ({
+        ...prev,
+        stuffingDate: "Invalid date format (DD-MM-YYYY)",
+      }));
+      return;
+    } else if (inputDate.isAfter(current)) {
+      toast.error("Stuffing Date cannot be in the future");
+      setErrors((prev) => ({
+        ...prev,
+        stuffingDate: "Date cannot be in the future",
+      }));
+      return;
+    } else if (inputDate.isBefore(minimum)) {
+      toast.error("Stuffing Date cannot be more than 3 days in the past");
+      setErrors((prev) => ({
+        ...prev,
+        stuffingDate: "Date cannot be more than 3 days in the past",
+      }));
+      return;
+    }
+
+    //Ship bill date validation
+    for (let i = 0; i < formList.length; i++) {
+      const dateValue = formList[i]?.shipBillDate?.trim() || "";
+
+      if (dateValue) {
+        const datePattern = /^(\d{2})([-/.])(\d{2})\2(\d{4})$/;
+        const match = dateValue.match(datePattern);
+
+        if (!match) {
+          toast.error(`Form ${i + 1}: Date must be in DD-MM-YYYY format`);
+          return;
+        }
+
+        const [, day, separator, month, year] = match;
+        const dateStr = `${day}${separator}${month}${separator}${year}`;
+        const dateMoment = moment(
+          dateStr,
+          `DD${separator}MM${separator}YYYY`,
+          true
+        );
+
+        if (!dateMoment.isValid()) {
+          toast.error(`Form ${i + 1}: Invalid date`);
+          return;
+        }
+
+        if (dateMoment.isAfter(moment())) {
+          toast.error(`Form ${i + 1}: Date cannot be in the future`);
+          return;
+        }
+      }
+    }
 
     // Calculate VGM difference
     const vgmByShipper = parseFloat(formData.vgmByShipper || 0);
@@ -329,56 +512,12 @@ const ICDStuffing = () => {
       (vgmDifference < -1000 || vgmDifference > 1000)
     ) {
       const shouldProceed = window.confirm(
-        `VGM difference is ${vgmDifference.toFixed(
-          2
-        )} kgs (Calculated VGM: ${calculatedVgm.toFixed(
-          2
-        )} kgs, Shipper VGM: ${vgmByShipper.toFixed(
-          2
-        )} kgs). Do you want to proceed with this entry?`
+        `VGM difference is ${vgmDifference} kgs (Calculated VGM: ${calculatedVgm} kgs, Shipper VGM: ${vgmByShipper} kgs). Do you want to proceed with this entry?`
       );
 
       if (!shouldProceed) {
         return; // Stop execution if user cancels
       }
-    }
-
-    // Conditional validation
-    const isHazardous =
-      formData.cargoCategory === "hazardous" ||
-      formData.cargoCategory === "both";
-    const isReefer =
-      formData.cargoCategory === "reefer" || formData.cargoCategory === "both";
-
-    if (!formData.cargoCategory) {
-      newErrors.cargoCategory = "Cargo Category is required field";
-    }
-
-    if (isHazardous) {
-      if (!formData.imoNumber) {
-        newErrors.imoNumber = "IMO Number is required for hazardous cargo";
-      }
-      if (!formData.unNumber) {
-        newErrors.unNumber = "UN Number is required for hazardous cargo";
-      }
-    }
-
-    if (isReefer) {
-      if (!formData.temprature) {
-        newErrors.temprature = "Temperature is required for reefer cargo";
-      }
-    }
-
-    if (formData.stuffingDate > currentDate) {
-      newErrors.stuffingDate = "Stuffing Date cannot be in the future";
-    }
-
-    setErrors(newErrors);
-
-    const hasErrors = Object.values(newErrors).some(Boolean);
-    if (hasErrors) {
-      toast.error("Please fix the errors");
-      return;
     }
 
     const payload = {
@@ -511,11 +650,52 @@ const ICDStuffing = () => {
   const previsousStateData = async () => {
     const containerNumber =
       fetchedContainer?.container_number || formData.containerNumber;
-    const res = await operationService.allotmentStuffingDetailsByContainerNo(
-      containerNumber
-    );
-    if (res.success) {
-      setPreviousPageData(res.data);
+
+    if (lastOperation == "19") {
+      const res = await operationService.allotmentStuffingDetailsByContainerNo(
+        containerNumber
+      );
+      if (res.success) {
+        setPreviousPageData(res.data);
+      }
+    } else if (lastOperation == "2") {
+      const res = await operationService.arrivalContainer(containerNumber);
+      if (res.success) {
+        console.log("Arrival Data::", res);
+        setFormData((prev) => ({
+          ...prev,
+          yardName: res.data.yard_id,
+        }));
+      }
+    } else if (lastOperation == "3") {
+      const res = await operationService.destuffFCLContainer(containerNumber);
+      if (res.success) {
+        console.log("FCL Data::", res);
+        setFormData((prev) => ({
+          ...prev,
+          yardName: res.data.yardId,
+        }));
+      }
+    } else if (lastOperation == "4") {
+      const res = await operationService.destuffLclContainer(containerNumber);
+      if (res.success) {
+        console.log("LCL Data::", res);
+        setFormData((prev) => ({
+          ...prev,
+          yardName: res.data.yardId,
+        }));
+      }
+    } else if (lastOperation == "5") {
+      const res = await operationService.destuffLclRequestContainer(
+        containerNumber
+      );
+      if (res.success) {
+        console.log("Request Data::", res);
+        setFormData((prev) => ({
+          ...prev,
+          yardName: res.data.yardId,
+        }));
+      }
     }
   };
 
@@ -544,12 +724,11 @@ const ICDStuffing = () => {
       custom: previousPageData.custom,
       other: previousPageData.other,
       otherSealRemarks: previousPageData.other_seal_desc,
+      containerStatus: previousPageData.containerStatus || "",
       // remarks: previousPageData.remark,
     }));
     // }
   }, [previousPageData]);
-
-  console.log("previousPageData::", previousPageData);
 
   return (
     <Fragment>
@@ -620,7 +799,10 @@ const ICDStuffing = () => {
                 </Row>
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Stuffing Date</label>
+                    <label>
+                      Stuffing Date{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="stuffingDate"
                       type="text"
@@ -628,7 +810,9 @@ const ICDStuffing = () => {
                         errors.stuffingDate ? "is-invalid" : ""
                       }`}
                       placeholder="Stuffing Date"
-                      onChange={handleChange}
+                      onChange={handleDateChange}
+                      max={currentDate}
+                      min={minAllowedDate}
                       value={formData.stuffingDate}
                     />
                     {errors.stuffingDate && (
@@ -638,7 +822,10 @@ const ICDStuffing = () => {
                     )}
                   </Col>
                   <Col md="6">
-                    <label>Cargo Category</label>
+                    <label>
+                      Cargo Category{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="cargoCategory"
                       className={`form-select ${
@@ -664,7 +851,10 @@ const ICDStuffing = () => {
                   formData.cargoCategory === "both") && (
                   <Row className="mb-3">
                     <Col md="6">
-                      <label>IMO Number</label>
+                      <label>
+                        IMO Number{" "}
+                        <span className="large mb-1 text-danger">*</span>
+                      </label>
                       <input
                         name="imoNumber"
                         type="text"
@@ -682,7 +872,10 @@ const ICDStuffing = () => {
                       )}
                     </Col>
                     <Col md="6">
-                      <label>UN Number</label>
+                      <label>
+                        UN Number{" "}
+                        <span className="large mb-1 text-danger">*</span>
+                      </label>
                       <input
                         name="unNumber"
                         type="text"
@@ -706,7 +899,10 @@ const ICDStuffing = () => {
                   formData.cargoCategory === "both") && (
                   <Row className="mb-3">
                     <Col md="6">
-                      <label>Temperature</label>
+                      <label>
+                        Temperature{" "}
+                        <span className="large mb-1 text-danger">*</span>
+                      </label>
                       <input
                         name="temprature"
                         type="text"
@@ -739,8 +935,12 @@ const ICDStuffing = () => {
                     />
                   </Col>
                   <Col md="6">
-                    <label>Yard Name</label>
+                    <label>
+                      Yard Name{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
+                      disabled={previousPageData.yard_id}
                       name="yardName"
                       onChange={handleChange}
                       value={formData.yardName}
@@ -805,9 +1005,9 @@ const ICDStuffing = () => {
                       onChange={handleChange}
                       value={formData.pdaAccount}
                     >
-                      <option value="">Shipper PDA </option>
-                      <option value="shipper_pda">Shipper PDA</option>
-                      <option value="linear_pda">Linear PDA</option>
+                      <option value="">Select PDA </option>
+                      <option value="shipper pda">Shipper PDA</option>
+                      <option value="liner pda">Liner PDA</option>
                     </select>
                   </Col>
                   <Col md="6">
@@ -824,17 +1024,24 @@ const ICDStuffing = () => {
                 </Row>
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>VGM By Shipper</label>
+                    <label>
+                      VGM By Shipper{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="vgmByShipper"
                       type="text"
-                      className="form-control"
+                      className={`form-control ${
+                        errors.vgmByShipper ? "is-invalid" : ""
+                      }`}
                       placeholder="VGM By Shipper"
                       onChange={handleChange}
                       value={formData.vgmByShipper}
                     />
-                    {errors.diffrence1 && (
-                      <span className="text-danger">Error Hai</span>
+                    {errors.vgmByShipper && (
+                      <div className="invalid-feedback">
+                        {errors.vgmByShipper}
+                      </div>
                     )}
                   </Col>
                   <Col md="6">
@@ -899,18 +1106,49 @@ const ICDStuffing = () => {
                                 <label className="form-label">
                                   {cargoFieldLabels[field] || field}
                                 </label>
-                                <input
-                                  type="text"
-                                  value={String(formData[field]).toUpperCase()}
-                                  onChange={(e) =>
-                                    handleInputChange(
-                                      index,
-                                      field,
-                                      e.target.value
-                                    )
-                                  }
-                                  className="form-control"
-                                />
+                                {field === "shipBillDate" ? (
+                                  <>
+                                    <input
+                                      type="text"
+                                      value={String(
+                                        formData[field]
+                                      ).toUpperCase()}
+                                      onChange={(e) =>
+                                        handleInputChange(
+                                          index,
+                                          field,
+                                          e.target.value
+                                        )
+                                      }
+                                      className={`form-control ${
+                                        errors[index]?.shipBillDate
+                                          ? "is-invalid"
+                                          : ""
+                                      }`}
+                                      placeholder="DD-MM-YYYY"
+                                    />
+                                    {errors[index]?.shipBillDate && (
+                                      <div className="invalid-feedback">
+                                        {errors[index].shipBillDate}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={String(
+                                      formData[field]
+                                    ).toUpperCase()}
+                                    onChange={(e) =>
+                                      handleInputChange(
+                                        index,
+                                        field,
+                                        e.target.value
+                                      )
+                                    }
+                                    className="form-control"
+                                  />
+                                )}
                               </div>
                             )
                         )}
@@ -1116,7 +1354,10 @@ const ICDStuffing = () => {
                   <h6 className="mt-5">Container Condition</h6>
                   <Row className="mb-3">
                     <Col md="6">
-                      <label>Container Status</label>
+                      <label>
+                        Container Status{" "}
+                        <span className="large mb-1 text-danger">*</span>
+                      </label>
                       <select
                         name="containerCondition"
                         className="form-select"

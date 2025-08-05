@@ -25,6 +25,8 @@ const AllotmentStuffing = () => {
   const [formList, setFormList] = useState([]);
   const [previousPageData, setPreviousPageData] = useState({});
   const [gateInLoadStatus, setGateInLoadStatus] = useState(null);
+  const [destuffDate, setDestuffDate] = useState(null);
+  const [lastOperation, setLastOperation] = useState(null);
   const [formData, setFormData] = useState({
     containerNumber,
     shippingLineId: "",
@@ -243,6 +245,68 @@ const AllotmentStuffing = () => {
   };
 
   const handleSave = async () => {
+    // Existing mandatory fields check
+    const mandatoryFields = {
+      allotmentDate: "Allotment Data",
+      allotmentType: "Allotment Type",
+      pdaAccount: "PDA Account",
+      cargoCategory: "CargoCategory",
+    };
+
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (fields) => !formData[fields]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+      return;
+    }
+
+    // Enhanced Date Validation with toast messages
+    const inputDate = moment(formData.allotmentDate, "DD-MM-YYYY", true);
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+    const previous = moment(destuffDate, "YYYY-MM-DD");
+
+    if (!inputDate.isValid()) {
+      toast.error("Invalid date format for Allotment Date (DD-MM-YYYY)");
+      setErrors((prev) => ({
+        ...prev,
+        allotmentDate: "Invalid date format (DD-MM-YYYY)",
+      }));
+      return;
+    }
+
+    if (inputDate.isAfter(current)) {
+      toast.error("Allotment Date cannot be in the future");
+      setErrors((prev) => ({
+        ...prev,
+        allotmentDate: "Date cannot be in the future",
+      }));
+      return;
+    }
+
+    if (inputDate.isBefore(minimum)) {
+      toast.error("Allotment Date cannot be more than 3 days in the past");
+      setErrors((prev) => ({
+        ...prev,
+        allotmentDate: "Date cannot be more than 3 days in the past",
+      }));
+      return;
+    }
+
+    if (inputDate.isBefore(previous)) {
+      toast.error(`Allotment Date cannot be before ${lastOperation} date`);
+      setErrors((prev) => ({
+        ...prev,
+        allotmentDate: `Date cannot be before ${lastOperation} date`,
+      }));
+      return;
+    }
+
     const formattedAllotmentDate = moment(
       formData.allotmentDate,
       "DD-MM-YYYY"
@@ -253,60 +317,14 @@ const AllotmentStuffing = () => {
       "DD-MM-YYYY"
     ).format("YYYY-MM-DD");
 
-    const newErrors = {
-      allotmentDate: !formData.allotmentDate
-        ? "This field is required"
-        : new Date(formData.allotmentDate) > new Date(currentDate)
-        ? "Allotment Date should not be greater than current date"
-        : "",
-      allotmentType: formData.allotmentType ? "" : "This field is required",
-      cargoCategory: formData.cargoCategory ? "" : "This field is required",
-      pdaAccount: formData.pdaAccount ? "" : "This field is required",
-    };
-
-    // Add validation for cargo category dependent fields
-    if (
-      formData.cargoCategory === "hazardous" ||
-      formData.cargoCategory === "both"
-    ) {
-      if (!formData.imoNumber) newErrors.imoNumber = "IMO Number is required";
-      if (!formData.unNumber) newErrors.unNumber = "UN Number is required";
-    }
-
-    if (
-      formData.cargoCategory === "refer" ||
-      formData.cargoCategory === "both"
-    ) {
-      if (!formData.temperature)
-        newErrors.temperature = "Temperature is required";
-    }
-
-    setErrors(newErrors);
-
-    // Check if there are any errors
-    const hasErrors = Object.values(newErrors).some((error) => error !== "");
-    if (hasErrors) {
-      toast.error("Please fill all required fields");
-      return;
-    }
-
-    const tare = Number(formData.tareWeight);
-    const mg = Number(formData.mgWeight);
-    const maxAllowed = mg - tare;
-    if (formData.cargoWeight && Number(formData.cargoWeight) > maxAllowed) {
-      newErrors.cargoWeight = `Overload: Cargo weight cannot exceed ${maxAllowed} kg`;
-    }
-
-    setErrors(newErrors);
-
     const payload = {
       containerNumber: fetchedContainer?.container_number || null,
       allotment_date: formattedAllotmentDate,
-      allotment_type: formData.allotmentType.toUpperCase(),
-      pda_account: formData.pdaAccount.toUpperCase() || null,
+      allotment_type: formData.allotmentType,
+      pda_account: formData.pdaAccount || null,
       agreement_party: formData.aggrementParty || null,
       shipper: formData.shipper || null,
-      cargo_category: formData.cargoCategory.toUpperCase(),
+      cargo_category: formData.cargoCategory,
       un_number: formData.unNumber || null,
       imo_number: formData.imoNumber || null,
       temperature: formData.temperature || null,
@@ -389,12 +407,20 @@ const AllotmentStuffing = () => {
         response = await operationService.getInDataFechByContainerNumber(
           containerNumber
         );
+        setLastOperation("Gate In");
+        setDestuffDate(response.data.inDate);
       } else if (lastOP == "4") {
         response = await operationService.destuffLclContainer(containerNumber);
+        setLastOperation("Destuff Lcl");
+        setDestuffDate(response.data.destuffDate);
       } else if (lastOP == "3") {
         response = await operationService.destuffFCLContainer(containerNumber);
+        setLastOperation("Destuff Fcl");
+        setDestuffDate(response.data.destuffDate);
       } else if (lastOP == "2") {
         response = await operationService.arrivalContainer(containerNumber);
+        setLastOperation("Arrival");
+        setDestuffDate(response.data.arraival_date);
       }
 
       if (response.success) {
@@ -407,6 +433,8 @@ const AllotmentStuffing = () => {
       console.log("error::", error);
     }
   };
+
+  console.log("Previous Date::", destuffDate);
 
   useEffect(() => {
     getPreviousPageData();
@@ -467,43 +495,50 @@ const AllotmentStuffing = () => {
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Allow only DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY using the same separator
+    // Improved date format validation
     const isValidFormat =
-      /^(0[1-9]|[12][0-9]|3[01])([-/.])(?:0[1-9]|1[0-2])\2\d{4}$/.test(value);
+      /^(0[1-9]|[12][0-9]|3[01])[-/.](0[1-9]|1[0-2])[-/.]\d{4}$/.test(value);
 
-    // Determine correct format based on separator
-    const matched = value.match(/^(\d{2})([-/.])(\d{2})\2(\d{4})$/);
-    const separator = matched?.[2];
-    const formatMap = {
-      "-": "DD-MM-YYYY",
-      "/": "DD/MM/YYYY",
-      ".": "DD.MM.YYYY",
-    };
-    const inputDate = moment(value, formatMap[separator], true);
+    // Try parsing with multiple formats
+    const formats = ["DD-MM-YYYY", "DD/MM/YYYY", "DD.MM.YYYY"];
+    const inputDate = moment(value, formats, true);
     const current = moment(currentDate, "DD-MM-YYYY");
     const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+    const destuff = moment(destuffDate, "YYYY-MM-DD");
+    console.log("Destuff Date::", destuff);
 
     if (!value) {
       setErrors((prev) => ({
         ...prev,
         [name]: "Date is required",
       }));
-    } else if (!isValidFormat || !inputDate.isValid()) {
+      return;
+    }
+
+    if (!isValidFormat || !inputDate.isValid()) {
       setErrors((prev) => ({
         ...prev,
         [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
       }));
-    } else if (name === "allotmentDate") {
-      // Only apply before/after validation for allotmentDate
-      if (inputDate.isAfter(current)) {
-        setErrors((prev) => ({
-          ...prev,
-          [name]: "Date cannot be in the future",
-        }));
-      } else if (inputDate.isBefore(minimum)) {
+      return;
+    }
+
+    // Specific validations for allotmentDate
+    if (name === "allotmentDate") {
+      if (inputDate.isBefore(minimum)) {
         setErrors((prev) => ({
           ...prev,
           [name]: "Date cannot be more than 3 days in the past",
+        }));
+      } else if (inputDate.isBefore(destuff)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: `Allotment date cannot be before ${lastOperation} date`,
+        }));
+      } else if (inputDate.isAfter(current)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be in the future",
         }));
       } else {
         setErrors((prev) => ({
@@ -512,14 +547,20 @@ const AllotmentStuffing = () => {
         }));
       }
     } else {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: undefined,
-      }));
+      // For other dates (like shipBillDate), just validate format and basic rules
+      if (inputDate.isAfter(current)) {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: "Date cannot be in the future",
+        }));
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          [name]: undefined,
+        }));
+      }
     }
   };
-
-  console.log("Previous Page Data::", previousPageData);
 
   return (
     <Fragment>
@@ -543,7 +584,10 @@ const AllotmentStuffing = () => {
               <div className="shadow-sm p-4 mt-4 rounded">
                 <Row className="mb-3 mt-5">
                   <Col md="4">
-                    <label htmlFor="">Allotment Date</label>
+                    <label htmlFor="">
+                      Allotment Date{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="allotmentDate"
                       type="text"
@@ -564,7 +608,10 @@ const AllotmentStuffing = () => {
                     )}
                   </Col>
                   <Col md="4">
-                    <label htmlFor="">Allotment Type</label>
+                    <label htmlFor="">
+                      Allotment Type{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="allotmentType"
                       className={`form-select ${
@@ -595,7 +642,10 @@ const AllotmentStuffing = () => {
                     )}
                   </Col>
                   <Col md="4">
-                    <label htmlFor="">PDA Account</label>
+                    <label htmlFor="">
+                      PDA Account{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="pdaAccount"
                       // className={`form-select form-control`}
@@ -608,7 +658,7 @@ const AllotmentStuffing = () => {
                     >
                       <option value="">Select PDA Account</option>
                       <option value="shipper pda">Shipper PDA</option>
-                      <option value="linear pda">Linear PDA</option>
+                      <option value="liner pda">Liner PDA</option>
                     </select>
                     {errors.pdaAccount && (
                       <div className="invalid-feedback">
@@ -643,7 +693,10 @@ const AllotmentStuffing = () => {
                     />
                   </Col>
                   <Col md="4">
-                    <label htmlFor="">Cargo Category</label>
+                    <label htmlFor="">
+                      Cargo Category{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="cargoCategory"
                       className={`form-select ${
@@ -745,8 +798,16 @@ const AllotmentStuffing = () => {
                 </Row>
                 <Row className="mb-3">
                   <Col md="4">
-                    <label>Yard Name</label>
+                    <label>
+                      Yard Name{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
+                      disabled={
+                        previousPageData.yard ||
+                        previousPageData.yardId ||
+                        previousPageData.yard_id
+                      }
                       name="yardName"
                       onChange={handleChange}
                       value={formData.yardName}

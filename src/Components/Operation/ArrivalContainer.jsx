@@ -95,23 +95,85 @@ const ArrivalContainer = () => {
 
   const [formData, setFormData] = useState(initialFormData);
 
+  // Reset form when containerNumber changes (for new container)
+  useEffect(() => {
+    setFormData(initialFormData);
+  }, [containerNumber, initialFormData]);
+
+  // Initialize data fetching
+  // useEffect(() => {
+  //   dispatch(fetchForwarders());
+  //   dispatch(fetchContainerTypes());
+  //   dispatch(fetchYards());
+  //   dispatch(fetchTransporters());
+  //   if (containerNumber) {
+  //     dispatch(fetchContainerByNumber(containerNumber));
+  //     dispatch(getPrefillData(containerNumber));
+  //   }
+  // }, [dispatch, containerNumber]);
+
   // Initialize data fetching
   useEffect(() => {
     dispatch(fetchForwarders());
     dispatch(fetchContainerTypes());
     dispatch(fetchYards());
     dispatch(fetchTransporters());
+
     if (containerNumber) {
+      // Reset form before fetching new data
+      setFormData(initialFormData);
       dispatch(fetchContainerByNumber(containerNumber));
       dispatch(getPrefillData(containerNumber));
+    } else {
+      // Ensure form is empty for new containers
+      setFormData(initialFormData);
     }
   }, [dispatch, containerNumber]);
 
   // Update form data when fetchedContainer or prefillData changes
+  // useEffect(() => {
+  //   const updatedData = { ...initialFormData };
+
+  //   // Fill from fetchedContainer
+  //   if (fetchedContainer) {
+  //     updatedData.containerNumber = fetchedContainer.container_number || "";
+  //     updatedData.shippingLineId = fetchedContainer.shipping_line_id || "";
+  //     updatedData.size = fetchedContainer.size || "";
+  //     updatedData.type = fetchedContainer.container_type || "";
+  //     updatedData.tareWeight = fetchedContainer.tare_weight || "";
+  //     updatedData.mgWeight = fetchedContainer.mg_weight || "";
+  //     updatedData.mfdDate = fetchedContainer.mfd_date || "";
+  //     updatedData.cscValidity = fetchedContainer.csc_validity || "";
+  //     updatedData.remarks = fetchedContainer.remarks || "";
+  //   }
+
+  //   // Fill from prefillData
+  //   if (prefillData) {
+  //     updatedData.forwarder1Id = prefillData.forwarder1 || "";
+  //     updatedData.forwarder2Id = prefillData.forwarder2 || "";
+  //     updatedData.transportMode = prefillData.transport_mode || "";
+  //     updatedData.yardId = prefillData.yard_name || "";
+  //     updatedData.pol = prefillData.pol || "";
+  //     updatedData.otherRemarks = prefillData.other_remarks || "";
+  //     updatedData.loadStatus = prefillData.load_status || "";
+  //     updatedData.wagonNumber = prefillData.wagon_no || "";
+  //     updatedData.trainTruckNumber = prefillData.train_truck_no || "";
+  //     updatedData.containerRemarks = prefillData.remarks || "";
+  //     updatedData.transporter = prefillData.transporter_id || "";
+  //     updatedData.shipline = prefillData.shipping_line_seal || "";
+  //   }
+
+  //   setFormData(updatedData);
+  // }, [fetchedContainer, prefillData, initialFormData]);
+
+  // Update form data when fetchedContainer or prefillData changes
   useEffect(() => {
+    // Skip if no container number (new container)
+    if (!containerNumber) return;
+
     const updatedData = { ...initialFormData };
 
-    // Fill from fetchedContainer
+    // Only update if fetchedContainer matches current containerNumber
     if (fetchedContainer) {
       updatedData.containerNumber = fetchedContainer.container_number || "";
       updatedData.shippingLineId = fetchedContainer.shipping_line_id || "";
@@ -124,7 +186,7 @@ const ArrivalContainer = () => {
       updatedData.remarks = fetchedContainer.remarks || "";
     }
 
-    // Fill from prefillData
+    // Only update if prefillData matches current container
     if (prefillData) {
       updatedData.forwarder1Id = prefillData.forwarder1 || "";
       updatedData.forwarder2Id = prefillData.forwarder2 || "";
@@ -141,7 +203,7 @@ const ArrivalContainer = () => {
     }
 
     setFormData(updatedData);
-  }, [fetchedContainer, prefillData, initialFormData]);
+  }, [fetchedContainer, prefillData, initialFormData, containerNumber]);
 
   const validateForm = (data) => {
     const errors = {};
@@ -160,14 +222,6 @@ const ArrivalContainer = () => {
 
     if (!data.containerStatus) {
       errors.containerStatus = "Container Status is required";
-    }
-
-    if (data.transportMode === "rail" && !data.wagonNumber) {
-      errors.wagonNumber = "Wagon Number is required";
-    }
-
-    if (data.transportMode === "road" && !data.transporter) {
-      errors.transporter = "Transporter is required";
     }
 
     if (!data.yardId) {
@@ -233,51 +287,222 @@ const ArrivalContainer = () => {
     });
   };
 
-  const handleSave = async () => {
-    const validationErrors = validateForm(formData);
-    const formattedArrivalDate = moment(
-      formData.arraival_date,
-      "DD-MM-YYYY"
-    ).format("YYYY-MM-DD");
+  // const handleSave = async () => {
+  //   const validationErrors = validateForm(formData);
+  //   const formattedArrivalDate = moment(
+  //     formData.arraival_date,
+  //     "DD-MM-YYYY"
+  //   ).format("YYYY-MM-DD");
 
-    if (Object.keys(validationErrors).length > 0) {
-      setFormErrors(validationErrors);
-      toast.error("Please correct the errors in the form");
+  //   if (Object.keys(validationErrors).length > 0) {
+  //     setFormErrors(validationErrors);
+  //     toast.error("Please correct the errors in the form");
+  //     return;
+  //   }
+
+  //   const payload = {
+  //     containerNumber: formData.containerNumber,
+  //     forwarder1Id: formData.forwarder1Id || null,
+  //     forwarder2Id: formData.forwarder2Id || null,
+  //     bookingNumber: formData.bookingNumber || null,
+  //     yardId: formData.yardId,
+  //     transportMode: formData.transportMode,
+  //     loadStatus: formData.loadStatus,
+  //     transporterId: formData.transporter || null,
+  //     wagonNumber: formData.wagonNumber || null,
+  //     trainTruckNumber: formData.trainTruckNumber || null,
+  //     seal_no: formData.shipline || null,
+  //     custom: formData.custom || null,
+  //     other: formData.other || null,
+  //     other_description: formData.other_description || null,
+  //     shipline: formData.shippingLineId || null,
+  //     containerRemarks: formData.containerRemarks || null,
+  //     operation: "2",
+  //     pol: formData.pol || null,
+  //     remarks: formData.containerRemarks || null,
+  //     otherRemarks: formData.otherRemarks || null,
+  //     arraival_date: formattedArrivalDate,
+  //     container_status: formData.containerStatus || null,
+  //   };
+
+  //   try {
+  //     const response = await dispatch(createArrivalContainer(payload)).unwrap();
+  //     console.log("response.data.data.insertedId::", response.data);
+
+  //     if (response?.success) {
+  //       toast.success(
+  //         `YOU HAVE SUCCESSFULLY SAVED ARRIVAL OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${response.data.arrivalContainerId}`
+  //       );
+  //       localStorage.setItem("operation", 2);
+  //       navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
+  //     } else {
+  //       toast.error(response?.message || "Something went wrong!");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error creating arrival container:", error);
+  //     toast.error(error.message || "Failed to create arrival container");
+  //   }
+  // };
+
+  // const handleArrivalDateChange = (e) => {
+  //   let { name, value } = e.target;
+
+  //   // Remove all non-digit characters first
+  //   value = value.replace(/\D/g, "");
+
+  //   // Limit to 8 digits (DDMMYYYY)
+  //   if (value.length > 8) value = value.slice(0, 8);
+
+  //   // Auto-insert dashes as DD-MM-YYYY
+  //   if (value.length >= 5) {
+  //     value =
+  //       value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+  //   } else if (value.length >= 3) {
+  //     value = value.slice(0, 2) + "-" + value.slice(2);
+  //   }
+
+  //   // Update input value
+  //   setFormData((prev) => ({ ...prev, [name]: value }));
+
+  //   // Only validate when input is fully typed in DD-MM-YYYY format
+  //   if (value.length === 10) {
+  //     const inputDate = moment(value, "DD-MM-YYYY", true);
+  //     const current = moment(currentDate, "DD-MM-YYYY");
+  //     const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+  //     if (!inputDate.isValid()) {
+  //       setFormErrors((prev) => ({
+  //         ...prev,
+  //         [name]: "Invalid date format (DD-MM-YYYY)",
+  //       }));
+  //     } else if (inputDate.isAfter(current)) {
+  //       setFormErrors((prev) => ({
+  //         ...prev,
+  //         [name]: "Arrival Date cannot be in the future",
+  //       }));
+  //     } else if (inputDate.isBefore(minimum)) {
+  //       setFormErrors((prev) => ({
+  //         ...prev,
+  //         [name]: "Arrival Date cannot be more than 3 days in the past",
+  //       }));
+  //     } else {
+  //       setFormErrors((prev) => ({ ...prev, [name]: undefined }));
+  //     }
+  //   } else {
+  //     // Don't show error while typing incomplete date
+  //     setFormErrors((prev) => ({ ...prev, [name]: undefined }));
+  //   }
+  // };
+
+  const handleSave = async () => {
+    // Mandatory fields and their display names
+    const mandatoryFields = {
+      yardId: "Yard Name",
+      transportMode: "Transport Mode",
+      loadStatus: "Load Status",
+      arraival_date: "Arrival Date",
+      containerStatus: "Container Status",
+    };
+
+    // Check which mandatory fields are empty
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (field) => !formData[field]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+
+      const newErrors = {};
+      emptyFields.forEach((field) => {
+        newErrors[field] = `${mandatoryFields[field]} is required`;
+      });
+      setFormErrors(newErrors);
+
       return;
     }
 
-    const payload = {
-      containerNumber: formData.containerNumber,
-      forwarder1Id: formData.forwarder1Id || null,
-      forwarder2Id: formData.forwarder2Id || null,
-      bookingNumber: formData.bookingNumber || null,
-      yardId: formData.yardId,
-      transportMode: formData.transportMode,
-      loadStatus: formData.loadStatus,
-      transporterId: formData.transporter || null,
-      wagonNumber: formData.wagonNumber || null,
-      trainTruckNumber: formData.trainTruckNumber || null,
-      seal_no: formData.shipline || null,
-      custom: formData.custom || null,
-      other: formData.other || null,
-      other_description: formData.other_description || null,
-      shipline: formData.shippingLineId || null,
-      containerRemarks: formData.containerRemarks || null,
-      operation: "2",
-      pol: formData.pol || null,
-      remarks: formData.containerRemarks || null,
-      otherRemarks: formData.otherRemarks || null,
-      arraival_date: formattedArrivalDate,
-      container_status: formData.containerStatus || null,
-    };
+    // Forwarder validation
+    if (
+      formData.forwarder1Id &&
+      formData.forwarder2Id &&
+      formData.forwarder1Id === formData.forwarder2Id
+    ) {
+      toast.error("Forwarder 1 and Forwarder 2 must be different");
+      setFormErrors((prev) => ({
+        ...prev,
+        forwarder2Id: "Forwarder 1 and Forwarder 2 must be different",
+      }));
+      return;
+    }
 
+    // Date validation
+    if (formData.arraival_date) {
+      const inputDate = moment(formData.arraival_date, "DD-MM-YYYY", true);
+      const current = moment(currentDate, "DD-MM-YYYY");
+      const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+      if (!inputDate.isValid()) {
+        toast.error("Invalid date format for Arrival Date");
+        setFormErrors((prev) => ({
+          ...prev,
+          arraival_date: "Invalid date format (DD-MM-YYYY)",
+        }));
+        return;
+      } else if (inputDate.isAfter(current)) {
+        toast.error("Arrival Date cannot be in the future");
+        setFormErrors((prev) => ({
+          ...prev,
+          arraival_date: "Date cannot be in the future",
+        }));
+        return;
+      } else if (inputDate.isBefore(minimum)) {
+        toast.error("Arrival Date cannot be more than 3 days in the past");
+        setFormErrors((prev) => ({
+          ...prev,
+          arraival_date: "Date cannot be more than 3 days in the past",
+        }));
+        return;
+      }
+    }
+
+    // If all validations pass
     try {
+      const payload = {
+        containerNumber: formData.containerNumber,
+        forwarder1Id: formData.forwarder1Id || null,
+        forwarder2Id: formData.forwarder2Id || null,
+        bookingNumber: formData.bookingNumber || null,
+        yardId: formData.yardId,
+        transportMode: formData.transportMode,
+        loadStatus: formData.loadStatus,
+        transporterId: formData.transporter || null,
+        wagonNumber: formData.wagonNumber || null,
+        trainTruckNumber: formData.trainTruckNumber || null,
+        seal_no: formData.shipline || null,
+        custom: formData.custom || null,
+        other: formData.other || null,
+        other_description: formData.other_description || null,
+        shipline: formData.shippingLineId || null,
+        containerRemarks: formData.containerRemarks || null,
+        operation: "2",
+        pol: formData.pol || null,
+        remarks: formData.containerRemarks || null,
+        otherRemarks: formData.otherRemarks || null,
+        arraival_date: moment(formData.arraival_date, "DD-MM-YYYY").format(
+          "YYYY-MM-DD"
+        ),
+        container_status: formData.containerStatus || null,
+      };
+
       const response = await dispatch(createArrivalContainer(payload)).unwrap();
       console.log("response.data.data.insertedId::", response.data);
 
       if (response?.success) {
         toast.success(
-          `YOU HAVE SUCCESSFULLY SAVED ARRIVAL OPERATION FOR ${containerNumber}. WHERE ENTRY ID IS ${response.data.arrivalContainerId}`
+          `YOU HAVE SUCCESSFULLY SAVED ARRIVAL OPERATION FOR ${formData.containerNumber}. WHERE ENTRY ID IS ${response.data.arrivalContainerId}`
         );
         localStorage.setItem("operation", 2);
         navigate(`${process.env.PUBLIC_URL}/app/operation/${layoutURL}`);
@@ -293,13 +518,13 @@ const ArrivalContainer = () => {
   const handleArrivalDateChange = (e) => {
     let { name, value } = e.target;
 
-    // Remove all non-digit characters first
+    // Remove non-digit characters
     value = value.replace(/\D/g, "");
 
     // Limit to 8 digits (DDMMYYYY)
     if (value.length > 8) value = value.slice(0, 8);
 
-    // Auto-insert dashes as DD-MM-YYYY
+    // Auto-insert dashes
     if (value.length >= 5) {
       value =
         value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
@@ -310,32 +535,39 @@ const ArrivalContainer = () => {
     // Update input value
     setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Only validate when input is fully typed in DD-MM-YYYY format
-    if (value.length === 10) {
-      const inputDate = moment(value, "DD-MM-YYYY", true);
-      const current = moment(currentDate, "DD-MM-YYYY");
-      const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+    // Regex to match full format DD-MM-YYYY
+    const fullDateRegex = /^\d{2}-\d{2}-\d{4}$/;
 
-      if (!inputDate.isValid()) {
-        setFormErrors((prev) => ({
-          ...prev,
-          [name]: "Invalid date format (DD-MM-YYYY)",
-        }));
-      } else if (inputDate.isAfter(current)) {
-        setFormErrors((prev) => ({
-          ...prev,
-          [name]: "Arrival Date cannot be in the future",
-        }));
-      } else if (inputDate.isBefore(minimum)) {
-        setFormErrors((prev) => ({
-          ...prev,
-          [name]: "Arrival Date cannot be more than 3 days in the past",
-        }));
-      } else {
-        setFormErrors((prev) => ({ ...prev, [name]: undefined }));
-      }
+    // Show error if format is invalid
+    if (!fullDateRegex.test(value)) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "Invalid date format (DD-MM-YYYY)",
+      }));
+      return; // Don't proceed to moment checks
+    }
+
+    // Format is valid → Now check date logic
+    const inputDate = moment(value, "DD-MM-YYYY", true);
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!inputDate.isValid()) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "Invalid date",
+      }));
+    } else if (inputDate.isAfter(current)) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "Arrival Date cannot be in the future",
+      }));
+    } else if (inputDate.isBefore(minimum)) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "Arrival Date cannot be more than 3 days in the past",
+      }));
     } else {
-      // Don't show error while typing incomplete date
       setFormErrors((prev) => ({ ...prev, [name]: undefined }));
     }
   };
@@ -449,7 +681,10 @@ const ArrivalContainer = () => {
                   </Col>
 
                   <Col md="6">
-                    <label>Yard Name</label>
+                    <label>
+                      Yard Name{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="yardId"
                       onChange={handleChange}
@@ -480,7 +715,10 @@ const ArrivalContainer = () => {
 
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Transport Mode</label>
+                    <label>
+                      Transport Mode{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="transportMode"
                       className={`form-select ${
@@ -501,7 +739,10 @@ const ArrivalContainer = () => {
                   </Col>
 
                   <Col md="6">
-                    <label>Load Status</label>
+                    <label>
+                      Load Status{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="loadStatus"
                       className={`form-select ${
@@ -621,7 +862,10 @@ const ArrivalContainer = () => {
 
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Arrival Date</label>
+                    <label>
+                      Arrival Date{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <input
                       name="arraival_date"
                       type="text"
@@ -700,7 +944,10 @@ const ArrivalContainer = () => {
                 <h5 className="mb-3 mt-4">Container Condition</h5>
                 <Row className="mb-3">
                   <Col md="6">
-                    <label>Container Status</label>
+                    <label>
+                      Container Status{" "}
+                      <span className="large mb-1 text-danger">*</span>
+                    </label>
                     <select
                       name="containerStatus"
                       className="form-select"

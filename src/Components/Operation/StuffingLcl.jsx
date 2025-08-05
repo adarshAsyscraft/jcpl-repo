@@ -141,6 +141,62 @@ const StuffingLCL = () => {
   const handleSave = async () => {
     setLoading(true);
     try {
+      const mandatoryFields = {
+        stuffingRequestDate: "Stuffing Request Date",
+      };
+
+      const emptyFields = Object.keys(mandatoryFields).filter(
+        (field) => !formData[field]
+      );
+
+      if (emptyFields.length > 0) {
+        const missingFieldsList = emptyFields
+          .map((field) => mandatoryFields[field])
+          .join(", ");
+        toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+
+        const newErrors = {};
+        emptyFields.forEach((field) => {
+          newErrors[field] = `${mandatoryFields[field]} is required`;
+        });
+        setErrors(newErrors);
+
+        return;
+      }
+
+      const requestDate = moment(
+        formData.stuffingRequestDate,
+        "DD-MM-YYYY",
+        true
+      );
+      const current = moment(currentDate, "DD-MM-YYYY");
+      const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+      if (!requestDate.isValid()) {
+        toast.error("Invalid date format for Arrival Date");
+        setErrors((prev) => ({
+          ...prev,
+          stuffingRequestDate: "Invalid date format (DD-MM-YYYY)",
+        }));
+        return;
+      } else if (requestDate.isAfter(current)) {
+        toast.error("Stuffing Request Date cannot be in the future");
+        setErrors((prev) => ({
+          ...prev,
+          stuffingRequestDate: "Date cannot be in the future",
+        }));
+        return;
+      } else if (requestDate.isBefore(minimum)) {
+        toast.error(
+          "Stuffing Request Date cannot be more than 3 days in the past"
+        );
+        setErrors((prev) => ({
+          ...prev,
+          stuffingRequestDate: "Date cannot be more than 3 days in the past",
+        }));
+        return;
+      }
+
       const payload = {
         container_id: fetchedContainer.id,
         stuffing_request_date: formData.stuffingRequestDate
@@ -263,9 +319,9 @@ const StuffingLCL = () => {
   useEffect(() => {
     setFormData((prev) => ({
       ...prev,
-      stuffingRequestDate:
-        moment(previousPageData.stuffing_request_date).format("DD-MM-YYYY") ||
-        null,
+      // stuffingRequestDate:
+      //   moment(previousPageData.stuffing_request_date).format("DD-MM-YYYY") ||
+      //   null,
       pol: previousPageData.pol || null,
       pod: previousPageData.pod || previousPageData.discharge_port_name || null,
       fpd: previousPageData.fpd || null,
@@ -277,6 +333,8 @@ const StuffingLCL = () => {
         previousPageData.custom_seal || previousPageData.custom || null,
     }));
   }, [previousPageData]);
+
+  console.log("PreviousPageData::", previousPageData);
 
   useEffect(() => {
     if (formData.containerNumber) {
@@ -441,7 +499,21 @@ const StuffingLCL = () => {
   };
 
   const handleDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    // Remove non-digit characters
+    value = value.replace(/\D/g, "");
+
+    // Limit to 8 digits (DDMMYYYY)
+    if (value.length > 8) value = value.slice(0, 8);
+
+    // Auto-insert dashes
+    if (value.length >= 5) {
+      value =
+        value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+    } else if (value.length >= 3) {
+      value = value.slice(0, 2) + "-" + value.slice(2);
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -515,7 +587,10 @@ const StuffingLCL = () => {
                     {/* <h6 className="mb-3 mt-4">Stuffing Request Date</h6> */}
                     <Row className="mb-3 mt-5">
                       <Col md="6">
-                        <label>Stuffing Request Date</label>
+                        <label>
+                          Stuffing Request Date{" "}
+                          <span className="large mb-1 text-danger">*</span>
+                        </label>
                         <input
                           name="stuffingRequestDate"
                           type="text"

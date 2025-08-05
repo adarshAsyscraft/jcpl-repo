@@ -35,6 +35,7 @@ const SocInspection = () => {
   const minAllowedDate = moment().subtract(3, "days").format("DD-MM-YYYY");
   const [errors, setErrors] = useState({});
   const [images, setImages] = useState([]);
+  const [surveyClient, setSurveyClient] = useState([]);
 
   const { fetchedContainer } = useSelector((state) => state.container);
   const { data: forwarders = [], loading: forwardersLoading } = useSelector(
@@ -43,7 +44,7 @@ const SocInspection = () => {
 
   const [formData, setFormData] = useState({
     containerNumber: "",
-    shippingLine: "",
+    shippingLineId: "",
     size: "",
     type: "",
     tareWeight: "",
@@ -63,6 +64,7 @@ const SocInspection = () => {
     anyOtherCondition: "",
     manufacturedBy: "",
     dateOfInspection: "",
+    clientName: "",
     nameOfIcd: "",
     inspectedBy: "",
     cscPlateNo: "",
@@ -94,7 +96,7 @@ const SocInspection = () => {
       setFormData((prev) => ({
         ...prev,
         containerNumber: fetchedContainer.container_number || "",
-        shippingLine: fetchedContainer.shipping_line_id || "",
+        shippingLineId: fetchedContainer.shipping_line_id || "",
         size: fetchedContainer.size || "",
         type: fetchedContainer.container_type || "",
         tareWeight: fetchedContainer.tare_weight || "",
@@ -114,7 +116,30 @@ const SocInspection = () => {
   };
 
   const handleDateChange = (e) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    value = value.replace(/\D/g, "");
+
+    if (name == "dateOfInspection") {
+      // Limit to 8 digits (DDMMYYYY)
+      if (value.length > 8) value = value.slice(0, 8);
+
+      // Auto-insert dashes as DD-MM-YYYY
+      if (value.length >= 5) {
+        value =
+          value.slice(0, 2) + "-" + value.slice(2, 4) + "-" + value.slice(4);
+      } else if (value.length >= 3) {
+        value = value.slice(0, 2) + "-" + value.slice(2);
+      }
+    } else if (name === "cscDate") {
+      // Handle MM-YYYY format
+      if (value.length > 6) value = value.slice(0, 6); // Limit to 6 digits (MMYYYY)
+
+      // Auto-insert dash after 2 digits (month)
+      if (value.length >= 3) {
+        value = `${value.slice(0, 2)}-${value.slice(2)}`;
+      }
+    }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
 
@@ -149,7 +174,7 @@ const SocInspection = () => {
       } else if (!isValidFormat) {
         setErrors((prev) => ({
           ...prev,
-          [name]: "Date must be in DD-MM-YYYY, DD/MM/YYYY or DD.MM.YYYY format",
+          [name]: "Invalid Date",
         }));
       } else if (inputDate.isAfter(current)) {
         setErrors((prev) => ({
@@ -179,7 +204,7 @@ const SocInspection = () => {
       } else if (!isValidFormat) {
         setErrors((prev) => ({
           ...prev,
-          [name]: "Date must be in MM-YYYY, MM/YYYY or MM.YYYY format",
+          [name]: "Invalid Date",
         }));
       } else {
         setErrors((prev) => ({
@@ -190,7 +215,96 @@ const SocInspection = () => {
     }
   };
 
+  const fetchSurveyClient = async () => {
+    const res = await operationService.getClientSurvey();
+    setSurveyClient(res.data);
+  };
+
+  useEffect(() => {
+    fetchSurveyClient();
+  }, []);
+
   const handleSave = async () => {
+    const mandatoryFields = {
+      clientName: "Survey Client",
+      dateOfInspection: "Inspection Date",
+      nameOfIcd: "ICD Name",
+      manufacturedBy: "Manufactured By",
+      yardName: "Yard Name",
+      inspectedBy: "Inspected By",
+      cscDate: "CSC Validity",
+      cscPlateNo: "CSC Plate Number",
+    };
+
+    if (formData.nameOfIcd === "other") {
+      mandatoryFields.customICD = "Custom Yard";
+    }
+    if (formData.yardName == "other") {
+      mandatoryFields.customYard = "Custom Yard";
+    }
+
+    const emptyFields = Object.keys(mandatoryFields).filter(
+      (field) => !formData[field]
+    );
+
+    if (emptyFields.length > 0) {
+      const missingFieldsList = emptyFields
+        .map((field) => mandatoryFields[field])
+        .join(", ");
+      toast.error(`PLEASE FILL THE MANDATORY FIELDS: ${missingFieldsList}`);
+
+      const newErrors = {};
+      emptyFields.forEach((field) => {
+        newErrors[field] = `${mandatoryFields[field]} is required`;
+      });
+      setErrors(newErrors);
+
+      return;
+    }
+
+    const inputDate = moment(formData.dateOfInspection, "DD-MM-YYYY");
+    const current = moment(currentDate, "DD-MM-YYYY");
+    const minimum = moment(minAllowedDate, "DD-MM-YYYY");
+
+    if (!inputDate.isValid()) {
+      toast.error("Invalid Date of Inspection");
+      setErrors((prev) => ({
+        ...prev,
+        dateOfInspection: "Invalid Date",
+      }));
+      return;
+    }
+    if (inputDate.isAfter(current)) {
+      toast.error("Inspection Date Cannot be in Future");
+      setErrors((prev) => ({
+        ...prev,
+        dateOfInspection: "Date cannot be in future",
+      }));
+      return;
+    }
+    if (inputDate.isBefore(minimum)) {
+      toast.error("Inspection Date cannot be more than 3 days in the past ");
+      setErrors((prev) => ({
+        ...prev,
+        dateOfInspection: "Date cannot be more than 3 days in the past",
+      }));
+      return;
+    }
+    if (formData.cscDate) {
+      // Only format validation: MM-YYYY / MM/YYYY / MM.YYYY
+      const inputDate = formData.cscDate.trim();
+      const isValidFormat = /^(0[1-9]|1[0-2])[-/.]\d{4}$/.test(inputDate);
+
+      if (!isValidFormat) {
+        toast.error("Invalid CSC Date");
+        setErrors((prev) => ({
+          ...prev,
+          cscDate: "Invalid CSC Date",
+        }));
+        return;
+      }
+    }
+
     const formDataToSend = new FormData();
 
     const formattedDateOfInspection = moment(
@@ -239,6 +353,7 @@ const SocInspection = () => {
       "container_condition",
       toNullIfEmpty(formData.containerRemarks)
     );
+    formDataToSend.append("clientName", toNullIfEmpty(formData.clientName));
     formDataToSend.append("front_panel", toNullIfEmpty(formData.frontPanel));
     formDataToSend.append(
       "left_side_panel",
@@ -266,7 +381,7 @@ const SocInspection = () => {
       const response = await operationService.socInspection(formDataToSend);
       if (response.success) {
         toast.success(
-          `YOU HAVE SUCCESSFULLY SAVED SEVEN-POINT CHECKLIST OPERATION FOR ${fetchedContainer?.container_number}. WHERE ENTRY ID IS ${response.data.id}`
+          `YOU HAVE SUCCESSFULLY SAVED SOC INSPECTION OPERATION FOR ${fetchedContainer?.container_number}. WHERE ENTRY ID IS ${response.data.id}`
         );
         navigate(`${process.env.PUBLIC_URL}/app/operation/Admin`);
       }
@@ -298,10 +413,37 @@ const SocInspection = () => {
                 disabled={true}
               />
 
+              <h5 className="mb-3 mt-5">Survey Client</h5>
+              <Row className="mb-3">
+                <Col md="6">
+                  <Label className="mb-1 ">
+                    Survey Client{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </Label>
+                  <select
+                    name="clientName"
+                    id=""
+                    className="form-select"
+                    value={formData.clientName}
+                    onChange={handleChange}
+                  >
+                    <option value="">Select Survey CLient</option>
+                    {surveyClient.map((client) => (
+                      <option value={client.clientName}>
+                        {client.clientName}
+                      </option>
+                    ))}
+                  </select>
+                </Col>
+              </Row>
+
               <h5 className="mb-3 mt-5">Inspection Details</h5>
               <Row className="mb-3">
                 <Col md="6">
-                  <label className="form-label">Date Of Inspection</label>
+                  <label className="form-label">
+                    Date Of Inspection{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="dateOfInspection"
                     type="text"
@@ -319,7 +461,10 @@ const SocInspection = () => {
                   )}
                 </Col>
                 <Col md="6">
-                  <label className="form-label">Manufactured By</label>
+                  <label className="form-label">
+                    Manufactured By{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="manufacturedBy"
                     placeholder="Manufactured By"
@@ -334,7 +479,10 @@ const SocInspection = () => {
               <Row className="mb-3">
                 {/* Name Of ICD */}
                 <Col md="6">
-                  <label>Name Of ICD</label>
+                  <label>
+                    Name Of ICD{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
                     name="nameOfIcd"
                     className="form-select"
@@ -363,7 +511,9 @@ const SocInspection = () => {
 
                 {/* Yard Name */}
                 <Col md="6">
-                  <label>Yard Name</label>
+                  <label>
+                    Yard Name <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <select
                     name="yardName"
                     className="form-select"
@@ -394,7 +544,10 @@ const SocInspection = () => {
 
               <Row className="mb-3">
                 <Col md="4">
-                  <label className="form-label">Inspected By</label>
+                  <label className="form-label">
+                    Inspected By{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="inspectedBy"
                     placeholder="Inspected By"
@@ -405,7 +558,10 @@ const SocInspection = () => {
                   />
                 </Col>
                 <Col md="4">
-                  <label className="form-label">CSC Validity</label>
+                  <label className="form-label">
+                    CSC Validity{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="cscDate"
                     type="text"
@@ -421,7 +577,10 @@ const SocInspection = () => {
                   )}
                 </Col>
                 <Col md="4">
-                  <label className="form-label">CSC Plate Number</label>
+                  <label className="form-label">
+                    CSC Plate Number{" "}
+                    <span className="large mb-1 text-danger">*</span>
+                  </label>
                   <input
                     name="cscPlateNo"
                     placeholder="CSC Plate Number"
